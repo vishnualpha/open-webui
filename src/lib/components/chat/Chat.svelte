@@ -257,9 +257,10 @@
 	};
 
 	onMount(async () => {
+		
 		window.addEventListener('message', onMessageHandler);
 		$socket?.on('chat-events', chatEventHandler);
-
+		
 		if (!$chatId) {
 			chatIdUnsubscriber = chatId.subscribe(async (value) => {
 				if (!value) {
@@ -300,6 +301,12 @@
 		chatInput?.focus();
 
 		chats.subscribe(() => {});
+		const savedPrompt = localStorage.getItem('selectedPrompt');
+		setTimeout(()=>{if (savedPrompt) {
+			prompt = savedPrompt; // Set the prompt in the text box
+			submitPrompt(savedPrompt); // Auto-submit
+			localStorage.removeItem('selectedPrompt'); // Clean up storage
+		}},1000);
 	});
 
 	onDestroy(() => {

@@ -30,7 +30,7 @@
 
 	export let history;
 
-	export let prompt = '';
+	export let prompt = localStorage.prompt ?? '';
 	export let files = [];
 	export let availableToolIds = [];
 	export let selectedToolIds = [];

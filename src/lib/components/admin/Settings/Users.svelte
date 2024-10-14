@@ -33,7 +33,7 @@
 			whitelistModels = res.models.length > 0 ? res.models : [''];
 		}
 
-		defaultModelId = $config.default_models ? $config?.default_models.split(',')[0] : '';
+		defaultModelId = $config.default_models ? $config?.default_models.split(',')[0] : 'chatgpt-4o-latest';
 	});
 </script>
 
