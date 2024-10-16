@@ -223,6 +223,9 @@
 		}
 	}
 
+	.mt-4 {
+		margin-left: -3rem;
+	}
 	footer a {
 		margin: 0 8px;
 		text-decoration: none;
