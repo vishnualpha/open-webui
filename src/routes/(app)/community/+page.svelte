@@ -12,7 +12,7 @@
 	// Ensure canonicalUrl is logged for debugging purposes
 	console.log("Canonical URL:", canonicalUrl);
 
-	let DiscourseEmbed = {
+	window.DiscourseEmbed = {
 		discourseUrl: 'https://community.thealpha.dev/', // Ensure trailing slash
 		discourseEmbedUrl: canonicalUrl, // Automatically sets the canonical URL
 		// className: 'CLASS_NAME', // Uncomment and replace with your CSS class if needed
