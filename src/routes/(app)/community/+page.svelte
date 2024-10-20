@@ -30,5 +30,6 @@
 	})();
 </script>
 
-<d-topics-list discourse-url="https://community.thealpha.dev/"></d-topics-list>
+
+<d-topics-list discourse-url="https://community.thealpha.dev"></d-topics-list>
 <meta name='discourse-username' content='alphadude'>
