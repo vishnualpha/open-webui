@@ -24,11 +24,11 @@
 		d.async = true;
 		
 		// Make sure the URL is concatenated correctly
-		d.src = DiscourseEmbed.discourseUrl + 'javascripts/embed.js';
+		d.src = DiscourseEmbed.discourseUrl + 'javascripts/embed-topics.js';
 		
 		(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(d);
 	})();
 </script>
 
-<div id='discourse-comments'></div>
+<d-topics-list discourse-url="https://community.thealpha.dev/"></d-topics-list>
 <meta name='discourse-username' content='alphadude'>
