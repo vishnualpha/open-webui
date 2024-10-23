@@ -4,18 +4,25 @@
 
 	import { flyAndScale } from '$lib/utils/transitions';
 	import { goto } from '$app/navigation';
+	import { getSessionUser } from '$lib/apis/auths';
 	import ArchiveBox from '$lib/components/icons/ArchiveBox.svelte';
 	import { showSettings, activeUserCount, USAGE_POOL, mobile, showSidebar } from '$lib/stores';
 	import { fade, slide } from 'svelte/transition';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 
 	const i18n = getContext('i18n');
-
+	let adminDetails = null;
 	export let show = false;
 	export let role = '';
 	export let className = 'max-w-[240px]';
 
 	const dispatch = createEventDispatcher();
+	onMount(async () => {
+		adminDetails = await getSessionUser(localStorage.token).catch((err) => {
+			console.error(err);
+			return null;
+		});
+	});
 </script>
 
 <DropdownMenu.Root
@@ -118,7 +125,7 @@
 					</div>
 					<div class=" self-center font-medium">{$i18n.t('Playground')}</div>
 				</button>
-
+				{#if adminDetails.name==='alphadude'} 
 				<button
 					class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
 					on:click={() => {
@@ -148,6 +155,7 @@
 					</div>
 					<div class=" self-center font-medium">{$i18n.t('Admin Panel')}</div>
 				</button>
+				{/if}
 			{/if}
 
 			<hr class=" dark:border-gray-800 my-1.5 p-0" />
