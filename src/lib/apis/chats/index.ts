@@ -32,6 +32,42 @@ export const createNewChat = async (token: string, chat: object) => {
 	return res;
 };
 
+// In $lib/apis/chats.js
+
+export async function getAllSharedChats(token: string, page: number, limit: number) {
+    const skip = page * limit;
+	let error = null;
+    const res = await fetch(`${WEBUI_API_BASE_URL}/chats/shared?skip=${skip}&limit=${limit}`,{
+		method: 'GET',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			authorization: `Bearer ${token}`
+		}
+	})
+		.then(async (res) => {
+			if (!res.ok) throw await res.json();
+			return res.json();
+		})
+		.then((json) => {
+			return json;
+		})
+		.catch((err) => {
+			error = err;
+			console.log(err);
+			return null;
+		});
+
+	if (error) {
+		throw error;
+	}
+	console.log(res);
+	return res.map((chat) => ({
+		...chat,
+		time_range: getTimeRange(chat.updated_at)
+	}));
+}
+
 export const getChatList = async (token: string = '', page: number | null = null) => {
 	let error = null;
 	const searchParams = new URLSearchParams();
@@ -73,7 +109,7 @@ export const getChatList = async (token: string = '', page: number | null = null
 
 export const getChatListByUserId = async (token: string = '', userId: string) => {
 	let error = null;
-
+	
 	const res = await fetch(`${WEBUI_API_BASE_URL}/chats/list/user/${userId}`, {
 		method: 'GET',
 		headers: {

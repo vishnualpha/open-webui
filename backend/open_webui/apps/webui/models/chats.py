@@ -192,7 +192,7 @@ class ChatTable:
                 return ChatModel.model_validate(chat)
         except Exception:
             return None
-
+    
     def archive_all_chats_by_user_id(self, user_id: str) -> bool:
         try:
             with get_db() as db:
@@ -327,6 +327,32 @@ class ChatTable:
                 .order_by(Chat.updated_at.desc())
             )
             return [ChatModel.model_validate(chat) for chat in all_chats]
+    
+    def get_shared_chats(self, skip: int = 0, limit: int = 50) -> list[ChatModel]:
+        """Fetches shared chats with pagination, limited to those with a share_id."""
+        with get_db() as db:
+            shared_chats = (
+                db.query(Chat)
+                .filter(Chat.share_id.isnot(None))
+                .order_by(Chat.updated_at.desc())
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
+            return [ChatModel.model_validate(chat) for chat in shared_chats]
+
+    def get_all_chats_with_shared_ids(self, skip: int = 0, limit: int = 50) -> list[ChatModel]:
+        """Fetches all chats that have share_ids, used primarily for admin access."""
+        with get_db() as db:
+            all_shared_chats = (
+                db.query(Chat)
+                .filter(Chat.share_id.isnot(None))
+                .order_by(Chat.updated_at.desc())
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
+            return [ChatModel.model_validate(chat) for chat in all_shared_chats]
 
     def get_archived_chats_by_user_id(self, user_id: str) -> list[ChatModel]:
         with get_db() as db:
