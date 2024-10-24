@@ -124,6 +124,7 @@
   
     .user-name {
       font-weight: bold;
+      color:#333;
     }
   
     .chat-title {

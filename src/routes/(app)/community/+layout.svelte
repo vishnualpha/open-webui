@@ -12,9 +12,7 @@
 	let searchValue = '';
 
 	onMount(async () => {
-		if ($user?.role !== 'admin') {
-			await goto('/');
-		}
+		
 		loaded = true;
 	});
 </script>
