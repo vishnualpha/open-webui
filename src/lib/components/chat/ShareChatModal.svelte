@@ -138,13 +138,50 @@
 								<button
 									class=" self-center px-3.5 py-2 rounded-xl text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-white"
 									type="button"
-									on:click={() => {
-										shareChat();
+									id="share-chat-button"
+									on:click={async () => {
+										const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+										if (isSafari) {
+											// Oh, Safari, you're so special, let's give you some extra love and attention
+											console.log('isSafari');
+
+											const getUrlPromise = async () => {
+												const url = await shareLocalChat();
+												return new Blob([url], { type: 'text/plain' });
+											};
+
+											navigator.clipboard
+												.write([
+													new ClipboardItem({
+														'text/plain': getUrlPromise()
+													})
+												])
+												.then(() => {
+													console.log('Async: Shared to community successfully!');
+													return true;
+												})
+												.catch((error) => {
+													console.error('Async: Could not copy text: ', error);
+													return false;
+												});
+										} else {
+											copyToClipboard(await shareLocalChat());
+										}
+
+										toast.success($i18n.t('Shared the chat to community!'));
 										show = false;
 									}}
 								>
-									{$i18n.t('Share to Community')}
+									<Link />
+
+									{#if chat.share_id}
+										{$i18n.t('Update and Share Link')}
+									{:else}
+										{$i18n.t('Share to Community')}
+									{/if}
 								</button>
+										
 							{/if}
 
 							<button
