@@ -20,6 +20,18 @@
 		};
 	}
 
+	// Stop all currently playing audio
+	function stopAllAudio() {
+	  Object.values(audioStates).forEach((audioState) => {
+	    if (audioState.isPlaying && audioState.currentAudio) {
+	      audioState.currentAudio.pause();
+	      audioState.currentAudio.currentTime = 0;
+	      audioState.isPlaying = false;
+	      audioState.currentAudio = null;
+	    }
+	  });
+	}
+
 	const loadMoreChats = async () => {
 		if (loading) return;
 		loading = true;
@@ -81,6 +93,8 @@
 			return;
 		}
 
+		stopAllAudio(); // Stop all other audio before playing
+
 		if (audioState.currentAudioIdx < audioState.audioParts.length && audioState.currentAudio) {
 			// Resume the paused audio
 			audioState.currentAudio.currentTime = audioState.pausedPosition;
@@ -97,13 +111,11 @@
 
 		const chat = sharedChats.find((chat) => chat.share_id === chatId);
 		for (let [index, message] of chat.chat.messages.entries()) {
-			const voice = index%2 === 0 ? 'nova' : 'alloy';
+			const voice = index % 2 === 0 ? 'nova' : 'alloy';
 			const content = message.content || '';
 			if (!content.trim()) continue;
 
 			try {
-        audioState.isPlaying = true;
-        audioStates = { ...audioStates }; //Trigger refresh of ui
 				const res = await synthesizeOpenAISpeech(localStorage.token, voice, content);
 				if (res) {
 					const blob = await res.blob();
@@ -137,7 +149,7 @@
 				} else {
 					audioState.currentAudioIdx = 0;
 					audioState.isPlaying = false;
-          audioState.currentAudio = null;
+					audioState.currentAudio = null;
 					audioStates = { ...audioStates };  // Ensure state change is visible
 				}
 			};
@@ -157,6 +169,7 @@
 		}
 	}
 </script>
+
 
 <div class="shared-chats">
 	<ul class="tile-container">
