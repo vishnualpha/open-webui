@@ -102,6 +102,8 @@
 			if (!content.trim()) continue;
 
 			try {
+        audioState.isPlaying = true;
+        audioStates = { ...audioStates }; //Trigger refresh of ui
 				const res = await synthesizeOpenAISpeech(localStorage.token, voice, content);
 				if (res) {
 					const blob = await res.blob();

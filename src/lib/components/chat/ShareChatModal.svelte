@@ -173,7 +173,6 @@
 										show = false;
 									}}
 								>
-									<Link />
 
 									{#if chat.share_id}
 										{$i18n.t('Update and Share Link')}
