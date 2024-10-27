@@ -20,7 +20,6 @@
 		};
 	}
 
-	// Stop all currently playing audio
 	function stopAllAudio() {
 	  Object.values(audioStates).forEach((audioState) => {
 	    if (audioState.isPlaying && audioState.currentAudio) {
@@ -65,6 +64,7 @@
 	onDestroy(() => {
 		clearInterval(interval);
 		window.removeEventListener('scroll', onScroll);
+		stopAllAudio(); // Stop any playing audio when the component is destroyed
 	});
 
 	const onScroll = () => {
