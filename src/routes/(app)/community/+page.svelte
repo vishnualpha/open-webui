@@ -83,56 +83,83 @@
 	};
 
 	async function playPauseAudio(chatId) {
-		const audioState = audioStates[chatId];
+	const audioState = audioStates[chatId];
 
-		if (audioState.isPlaying && audioState.currentAudio) {
-			audioState.pausedPosition = audioState.currentAudio.currentTime;
-			audioState.currentAudio.pause();
-			audioState.isPlaying = false;
-			audioStates = { ...audioStates };  // Trigger reactive update
-			return;
-		}
-
-		stopAllAudio(); // Stop all other audio before playing
-
-		if (audioState.currentAudioIdx < audioState.audioParts.length && audioState.currentAudio) {
-			// Resume the paused audio
-			audioState.currentAudio.currentTime = audioState.pausedPosition;
-			audioState.currentAudio.play();
-			audioState.isPlaying = true;
-			audioStates = { ...audioStates };  // Trigger reactive update
-			return;
-		}
-
-		// Prepare audio parts for prompt and response
-		audioState.audioParts = [];
-		audioState.currentAudioIdx = 0;
-		audioState.pausedPosition = 0;
-
-		const chat = sharedChats.find((chat) => chat.share_id === chatId);
-		for (let [index, message] of chat.chat.messages.entries()) {
-			const voice = index % 2 === 0 ? 'nova' : 'alloy';
-			const content = message.content || '';
-			if (!content.trim()) continue;
-
-			try {
-				const res = await synthesizeOpenAISpeech(localStorage.token, voice, content);
-				if (res) {
-					const blob = await res.blob();
-					const blobUrl = URL.createObjectURL(blob);
-					audioState.audioParts.push(blobUrl);
-				}
-			} catch (error) {
-				console.error('Error synthesizing speech:', error);
-			}
-		}
-
-		if (audioState.audioParts.length) {
-			audioState.isPlaying = true; 
-			audioStates = { ...audioStates };  // Trigger reactive update
-			await playCurrentAudio(audioState);
-		}
+	if (audioState.isPlaying && audioState.currentAudio) {
+		audioState.pausedPosition = audioState.currentAudio.currentTime;
+		audioState.currentAudio.pause();
+		audioState.isPlaying = false;
+		audioStates = { ...audioStates };  // Trigger reactive update
+		return;
 	}
+
+	stopAllAudio(); // Stop all other audio before playing
+
+	audioState.audioParts = []; // Initialize in case of replay
+	audioState.currentAudioIdx = 0;
+	audioState.pausedPosition = 0;
+	audioState.isPlaying = true;
+	audioStates = { ...audioStates };  // Trigger reactive update
+
+	const chat = sharedChats.find((chat) => chat.share_id === chatId);
+
+	function chunkText(text, sentencesPerChunk = 3) {
+	const sentenceEndRegex = /(?<=[.!?])\s+/g;
+	const sentences = text.split(sentenceEndRegex);
+	const chunks = [];
+
+	for (let i = 0; i < sentences.length; i += sentencesPerChunk) {
+		chunks.push(sentences.slice(i, i + sentencesPerChunk).join(' '));
+	}
+	
+	return chunks;
+}
+
+async function synthesizeAndPlay(index) {
+    if (index >= chat.chat.messages.length) {
+        audioState.isPlaying = false;
+        audioStates = { ...audioStates };  // Update state
+        return;
+    }
+
+    const message = chat.chat.messages[index];
+    const voice = index % 2 === 0 ? 'nova' : 'alloy';
+    const content = message.content || '';
+    if (!content.trim()) {
+        synthesizeAndPlay(index + 1);
+        return;
+    }
+
+    const contentChunks = chunkText(content);
+
+    try {
+        for (let chunk of contentChunks) {
+            const res = await synthesizeOpenAISpeech(localStorage.token, voice, chunk);
+            if (res) {
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                audioState.audioParts.push(blobUrl);
+
+                audioState.currentAudio = new Audio(blobUrl);
+                audioState.currentAudio.currentTime = audioState.pausedPosition;
+                await new Promise((resolve) => {
+                    audioState.currentAudio.onended = resolve;
+                    audioState.currentAudio.play();
+                });
+            }
+        }
+        audioState.pausedPosition = 0;
+        audioState.currentAudioIdx++;
+        synthesizeAndPlay(index + 1);
+    } catch (error) {
+        console.error('Error synthesizing speech:', error);
+        synthesizeAndPlay(index + 1); // Continue with the next message
+    }
+}
+
+
+	synthesizeAndPlay(audioState.currentAudioIdx);
+}
 
 	async function playCurrentAudio(audioState) {
 		if (audioState.currentAudioIdx < audioState.audioParts.length) {
