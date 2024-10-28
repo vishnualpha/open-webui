@@ -8,7 +8,8 @@ import type { Socket } from 'socket.io-client';
 export const WEBUI_NAME = writable(APP_NAME);
 export const config: Writable<Config | undefined> = writable(undefined);
 export const user: Writable<SessionUser | undefined> = writable(undefined);
-
+export const LANDING_MESSAGE = writable("Boost Productivity with Shared LLM Insights");
+export const LANDING_SUBMESSAGE = writable("Discover, create, and share powerful AI-driven chats and prompts. Explore community-powered LLM resources to streamline your work and inspire new ideas.");
 // Frontend
 export const MODEL_DOWNLOAD_POOL = writable({});
 

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { WEBUI_BASE_URL } from '$lib/constants';
+	import { WEBUI_BASE_URL  } from '$lib/constants';
+	import { WEBUI_NAME, LANDING_MESSAGE, LANDING_SUBMESSAGE  } from '$lib/stores';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 
@@ -62,7 +63,7 @@
 </script>
 
 <svelte:head>
-	<title>Chat Interface</title>
+	<title>{$WEBUI_NAME}</title>
 </svelte:head>
 
 {#key mounted}
@@ -71,28 +72,31 @@
 
 		<!-- Logo in the top-left corner -->
 		<div class="fixed top-10 left-10">
+			<a href="/">
 			<img
 				crossorigin="anonymous"
 				src="{WEBUI_BASE_URL}/static/logo.png"
 				class="w-36 rounded-full"
 				alt="logo"
 			/>
+			</a>
 		</div>
 
 		<!-- Centered chat section -->
 		<div class="flex justify-center items-center h-full">
 			<div class="max-w-4xl w-full px-8 lg:px-20 text-center">
 				<!-- Greeting with animated role text -->
-				<div class="text-4xl text-gray-800 dark:text-gray-100 font-medium mb-6">
-					{staticText} 
+				<div class="text-7xl text-gray-800 dark:text-gray-100 font-large mb-8">
+					<!--{staticText}
 					<span class="gradient-text">{roleText}</span>
 					{#if showCursor}
 						<span class="blinking-cursor"></span>
-					{/if}
+					{/if}-->
+					<span class="gradient-text">{$LANDING_MESSAGE}</span>
 				</div>
 				<!-- Explanation Below Greeting Text -->
-				<div class="text-lg text-gray-600 dark:text-gray-400 mb-8">
-					Our Community and Tools help you enable yourself with AI/LLM Usage and to Share your expertise with others, to grow together.
+				<div class="text-md text-gray-600 dark:text-gray-400 mb-8">
+					{$LANDING_SUBMESSAGE}
 				</div>
 
 				<!-- Chat Input Form -->
@@ -115,7 +119,7 @@
 									id="chat-textarea"
 									bind:this={chatTextAreaElement}
 									class="scrollbar-hidden bg-gray-50 dark:bg-gray-850 dark:text-gray-100 outline-none w-full py-3 px-1 rounded-xl resize-none h-[48px]"
-									placeholder="Type Hi and hit Send to get started..."
+									placeholder="Type something or Select a prompt from below to get started..."
 									rows="1"
 									bind:value={prompt}
 									on:input={adjustTextareaHeight}
@@ -207,7 +211,7 @@
 	}
 
 	.gradient-text {
-		background: linear-gradient(90deg, #FFB94F, #FFC107);
+		background: linear-gradient(0deg, #FFB94F, #dfad1593);
 		-webkit-background-clip: text;
 		-webkit-text-fill-color: transparent;
 	}
