@@ -87,6 +87,13 @@
 	};
 
 	onMount(async () => {
+		// Check the mode query parameter
+		const urlParams = new URLSearchParams($page.url.search);
+		const queryMode = urlParams.get('mode');
+
+		if (queryMode) {
+			mode = queryMode;
+		}
 		if ($user !== undefined) {
 			await goto('/');
 		}
@@ -108,12 +115,14 @@
 	<div class="fixed m-10 z-50">
 		<div class="flex space-x-2">
 			<div class=" self-center">
-				<img
-					crossorigin="anonymous"
-					src="{WEBUI_BASE_URL}/static/logo.png"
-					class=" w-36 rounded-full"
-					alt="logo"
-				/>
+				<a href="/">
+					<img
+						crossorigin="anonymous"
+						src="{WEBUI_BASE_URL}/static/logo.png"
+						class=" w-36 rounded-full"
+						alt="logo"
+					/>
+				</a>
 			</div>
 		</div>
 	</div>
@@ -374,3 +383,4 @@
 			'Noto Color Emoji';
 	}
 </style>
+

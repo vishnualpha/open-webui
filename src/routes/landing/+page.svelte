@@ -81,7 +81,16 @@
 			/>
 			</a>
 		</div>
-
+		<!-- Signup button added to the top-right corner -->
+		<div class="fixed top-10 right-10">
+			<button
+				class=" bg-gray-900 hover:bg-gray-800 w-full rounded-2xl text-white font-medium text-sm py-2 transition"
+				style="width:100px;"
+				on:click={() => goto('/auth?mode=signin')}
+			>
+				Sign In
+			</button>
+		</div>
 		<!-- Centered chat section -->
 		<div class="flex justify-center items-center h-full">
 			<div class="max-w-4xl w-full px-8 lg:px-20 text-center">
