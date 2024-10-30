@@ -83,7 +83,7 @@
 			<div>
 				<div class=" capitalize line-clamp-1" in:fade={{ duration: 200 }}>
 					{#if models[selectedModelIdx]?.info}
-						{models[selectedModelIdx]?.info?.name}
+						{$i18n.t('Hello, {{name}}', { name: $user.name })}
 					{:else}
 						{$i18n.t('Hello, {{name}}', { name: $user.name })}
 					{/if}
@@ -94,8 +94,9 @@
 						<div
 							class="mt-0.5 text-base font-normal text-gray-500 dark:text-gray-400 line-clamp-3 markdown"
 						>
+						{models[selectedModelIdx]?.info?.name}:
 							{@html marked.parse(
-								sanitizeResponseContent(models[selectedModelIdx]?.info?.meta?.description)
+								sanitizeResponseContent(models[selectedModelIdx]?.info?.name+":"+models[selectedModelIdx]?.info?.meta?.description)
 							)}
 						</div>
 						{#if models[selectedModelIdx]?.info?.meta?.user}
