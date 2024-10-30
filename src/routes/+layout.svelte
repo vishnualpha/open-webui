@@ -33,6 +33,11 @@
 	import i18n, { initI18n, getLanguages } from '$lib/i18n';
 	import { bestMatchingLanguage } from '$lib/utils';
 
+	import { init } from '@amplitude/analytics-browser';
+
+	// Initialize Amplitude
+	init('c5700722ba574db3ea9184b62dec1f89'); // Replace with your Amplitude API key
+
 	setContext('i18n', i18n);
 
 	let loaded = false;

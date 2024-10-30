@@ -1,55 +1,78 @@
 <script lang="ts">
-	import { WEBUI_BASE_URL  } from '$lib/constants';
-	import { WEBUI_NAME, LANDING_MESSAGE, LANDING_SUBMESSAGE  } from '$lib/stores';
+	import { WEBUI_BASE_URL } from '$lib/constants';
+	import { WEBUI_NAME, LANDING_MESSAGE, LANDING_SUBMESSAGE } from '$lib/stores';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { track } from '@amplitude/analytics-browser';
 
+	// Track page visit
+	onMount(() => {
+		track('Page Visited', {
+			page: window.location.pathname,
+			referrer: document.referrer,
+			timestamp: new Date().toISOString(),
+		});
+	});
+
+	const trackLinkClick = (linkName) => {
+		track('Link Clicked', {
+			linkName,
+			timestamp: new Date().toISOString(),
+		});
+	};
+
+	const trackChatAreaFocus = () => {
+		track('Chat Area Focused', {
+			timestamp: new Date().toISOString(),
+		});
+	};
+
+	const trackChatAreaSubmission = () => {
+		track('Chat Area Submission', {
+			messageLength: prompt.trim().length,
+			timestamp: new Date().toISOString(),
+		});
+	};
 	let mounted = false;
-	let roles = ['best Software Professional', 'best Developer', 'best Quality Engineer', 'best DevOps Engineer', 'Alpha']; // Array of roles
-	let currentRoleIndex = 0; // Index to track the current role
-	let roleText = ''; // Variable to display the role text with animation
-	let showCursor = true; // Toggle to show/hide the blinking cursor
-	const staticText = 'Be the'; // Constant text
-	let prompt = ''; // Chat input binding
-	let chatTextAreaElement; // To bind the text area element
-	let suggestions = ['How do I improve my skills?', 'Can you guide me in DevOps?', 'Help me write clean code']; // Example prompts
+	let roles = ['best Software Professional', 'best Developer', 'best Quality Engineer', 'best DevOps Engineer', 'Alpha'];
+	let currentRoleIndex = 0;
+	let roleText = '';
+	let showCursor = true;
+	const staticText = 'Be the';
+	let prompt = '';
+	let chatTextAreaElement;
+	let suggestions = ['How do I improve my skills?', 'Can you guide me in DevOps?', 'Help me write clean code'];
 
-	// Typing effect for role
 	const typeRole = async (role) => {
 		showCursor = true;
 		for (let i = 0; i < role.length; i++) {
 			roleText += role[i];
-			await new Promise((r) => setTimeout(r, 100)); // Adjust typing speed
+			await new Promise((r) => setTimeout(r, 100));
 		}
-		//showCursor = false;
-		await new Promise((r) => setTimeout(r, 1000)); // Small pause before switching role
+		await new Promise((r) => setTimeout(r, 1000));
 	};
 
-	// Function to cycle through roles and animate them
 	const cycleRoles = async () => {
 		while (true) {
-			roleText = ''; // Clear the text before typing a new role
+			roleText = '';
 			await typeRole(roles[currentRoleIndex]);
-			currentRoleIndex = (currentRoleIndex + 1) % roles.length; // Move to the next role in a loop
+			currentRoleIndex = (currentRoleIndex + 1) % roles.length;
 		}
 	};
 
-	// Handle prompt submission
 	const handlePromptSubmission = () => {
 		if (prompt.trim()) {
-			localStorage.setItem('selectedPrompt',prompt);
+			localStorage.setItem('selectedPrompt', prompt);
 			goto('/auth');
 		}
 	};
 
-	// Adjust textarea height dynamically
 	const adjustTextareaHeight = (event) => {
 		const element = event.target;
 		element.style.height = '48px';
 		element.style.height = `${element.scrollHeight}px`;
 	};
 
-	// Function to set prompt from suggestions
 	const setPromptFromSuggestion = (suggestedPrompt) => {
 		prompt = suggestedPrompt;
 		chatTextAreaElement?.focus();
@@ -57,8 +80,8 @@
 
 	onMount(() => {
 		mounted = true;
-		chatTextAreaElement?.focus(); // Focus on text area element
-		cycleRoles(); // Start cycling through roles with animation
+		chatTextAreaElement?.focus();
+		cycleRoles();
 	});
 </script>
 
@@ -67,63 +90,53 @@
 </svelte:head>
 
 {#key mounted}
-	<!-- Main container for the layout -->
-	<div class="relative h-screen bg-white dark:bg-gray-950 font-primary">
+	<div class="relative min-h-screen bg-white dark:bg-gray-950 font-primary">
 
-		<!-- Logo in the top-left corner -->
-		<div class="fixed top-10 left-10">
+		<div class="fixed top-10 left-4 md:left-10">
 			<a href="/">
-			<img
-				crossorigin="anonymous"
-				src="{WEBUI_BASE_URL}/static/logo.png"
-				class="w-36 rounded-full"
-				alt="logo"
-			/>
+				<img
+					crossorigin="anonymous"
+					src="{WEBUI_BASE_URL}/static/logo.png"
+					class="w-20 md:w-36 rounded-full"
+					alt="logo"
+				/>
 			</a>
 		</div>
-		<!-- Signup button added to the top-right corner -->
-		<div class="fixed top-10 right-10">
+
+		<div class="fixed top-10 right-4 md:right-10">
 			<button
-				class=" bg-gray-900 hover:bg-gray-800 w-full rounded-2xl text-white font-medium text-sm py-2 transition"
-				style="width:100px;"
-				on:click={() => goto('/auth?mode=signin')}
+				class="bg-gray-900 hover:bg-gray-800 rounded-2xl text-white font-medium text-sm py-2 px-4 transition"
+				on:click={() => {
+					trackLinkClick('auth');
+					goto('/auth?mode=signin')
+				}}
 			>
 				Sign In
 			</button>
 		</div>
-		<!-- Centered chat section -->
-		<div class="flex justify-center items-center h-full">
-			<div class="max-w-4xl w-full px-8 lg:px-20 text-center">
-				<!-- Greeting with animated role text -->
-				<div class="text-7xl text-gray-800 dark:text-gray-100 font-large mb-8">
-					<!--{staticText}
-					<span class="gradient-text">{roleText}</span>
-					{#if showCursor}
-						<span class="blinking-cursor"></span>
-					{/if}-->
+
+		<div class="flex justify-center items-center min-h-screen px-4 md:px-0">
+			<div class="max-w-4xl w-full text-center">
+				<div class="text-3xl md:text-6xl text-gray-800 dark:text-gray-100 font-large mb-8">
 					<span class="gradient-text">{$LANDING_MESSAGE}</span>
 				</div>
-				<!-- Explanation Below Greeting Text -->
-				<div class="text-md text-gray-600 dark:text-gray-400 mb-8">
+
+				<div class="text-sm md:text-md text-gray-600 dark:text-gray-400 mb-8">
 					{$LANDING_SUBMESSAGE}
 				</div>
 
-				<!-- Chat Input Form -->
-				<div class="bg-white dark:bg-gray-900 p-6 rounded-3xl">
-					<form class="w-full flex gap-1.5" on:submit|preventDefault={handlePromptSubmission}>
-						<!-- Chat Input Field -->
-						<div class="flex-1 flex flex-col relative w-full rounded-3xl px-1.5 bg-gray-50 dark:bg-gray-850 dark:text-gray-100">
+				<div class="bg-white dark:bg-gray-900 p-4 md:p-6 rounded-3xl">
+					<form class="flex flex-col md:flex-row gap-1.5" on:submit|preventDefault={handlePromptSubmission}>
+						<div class="flex-1 flex flex-col w-full rounded-3xl px-1.5 bg-gray-50 dark:bg-gray-850 dark:text-gray-100">
 							<div class="flex">
-								<div class="ml-0.5 self-end mb-1.5 flex space-x-1">
-									<!-- Add Prompt Button -->
-									<button type="button" class="bg-gray-50 hover:bg-gray-100 text-gray-800 dark:bg-gray-850 dark:text-white dark:hover:bg-gray-800 transition rounded-full p-2 outline-none focus:outline-none" aria-label="More">
+								<div class="self-end mb-1.5 flex space-x-1">
+									<button type="button" class="bg-gray-50 hover:bg-gray-100 text-gray-800 dark:bg-gray-850 dark:text-white dark:hover:bg-gray-800 transition rounded-full p-2" aria-label="More">
 										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-5">
 											<path d="M8.75 3.75a.75.75 0 0 0-1.5 0v3.5h-3.5a.75.75 0 0 0 0 1.5h3.5v3.5a.75.75 0 0 0 1.5 0v-3.5h3.5a.75.75 0 0 0 0-1.5h-3.5v-3.5Z"></path>
 										</svg>
 									</button>
 								</div>
 
-								<!-- Textarea for Chat Input -->
 								<textarea
 									id="chat-textarea"
 									bind:this={chatTextAreaElement}
@@ -131,55 +144,54 @@
 									placeholder="Type something or Select a prompt from below to get started..."
 									rows="1"
 									bind:value={prompt}
+									on:focus={trackChatAreaFocus}
 									on:input={adjustTextareaHeight}
 									on:keydown={(e) => {
 										if (e.key === 'Enter' && !e.shiftKey) {
-											e.preventDefault(); 
-											handlePromptSubmission(); 
+											e.preventDefault();
+											trackChatAreaSubmission();
+											handlePromptSubmission();
 										}
 									}}
 								></textarea>
 
 								<div class="self-end mb-2 flex space-x-1 mr-1">
-									<!-- Voice Input Button -->
-									<button id="voice-input-button" class="text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-850 transition rounded-full p-1.5 mr-0.5 self-center" type="button" aria-label="Voice Input">
+									<button id="voice-input-button" class="text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-850 transition rounded-full p-1.5 self-center" type="button" aria-label="Voice Input">
 										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
 											<path d="M7 4a3 3 0 016 0v6a3 3 0 11-6 0V4z"></path>
 											<path d="M5.5 9.643a.75.75 0 00-1.5 0V10c0 3.06 2.29 5.585 5.25 5.954V17.5h-1.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-1.5v-1.546A6.001 6.001 0 0016 10v-.357a.75.75 0 00-1.5 0V10a4.5 4.5 0 01-9 0v-.357z"></path>
 										</svg>
 									</button>
 								</div>
+								<div class="flex items-end w-10">
+									<button
+										class="{prompt.trim() !== '' ? 'bg-black text-white hover:bg-gray-900' : 'bg-gray-200 text-gray-600'} transition rounded-full p-1.5 self-center"
+										type="submit"
+										disabled={prompt.trim() === ''}
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-5">
+											<path
+												fill-rule="evenodd"
+												d="M8 14a.75.75 0 0 1-.75-.75V4.56L4.03 7.78a.75.75 0 0 1-1.06-1.06l4.5-4.5a.75.75 0 0 1 1.06 0l4.5 4.5a.75.75 0 0 1-1.06 1.06L8.75 4.56v8.69A.75.75 0 0 1 8 14Z"
+												clip-rule="evenodd"
+											/>
+										</svg>
+									</button>
+								</div>
 							</div>
 						</div>
 
-						<!-- Send Message Button -->
-						<div class="flex items-end w-10">
-							<button
-								class="{prompt.trim() !== '' ? 'bg-black text-white hover:bg-gray-900' : 'bg-gray-200 text-gray-600'} transition rounded-full p-1.5 m-0.5 self-center"
-								type="submit"
-								disabled={prompt.trim() === ''}
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="size-5">
-									<path
-										fill-rule="evenodd"
-										d="M8 14a.75.75 0 0 1-.75-.75V4.56L4.03 7.78a.75.75 0 0 1-1.06-1.06l4.5-4.5a.75.75 0 0 1 1.06 0l4.5 4.5a.75.75 0 0 1-1.06 1.06L8.75 4.56v8.69A.75.75 0 0 1 8 14Z"
-										clip-rule="evenodd"
-									/>
-								</svg>
-							</button>
-						</div>
+						
 					</form>
 
-					<!-- Prompt Suggestions -->
-					<div class="mt-4">
-						{#each suggestions as suggestion,i}
+					<div class="mt-4 text-sm md:text-base">
+						{#each suggestions as suggestion, i}
 							<button
 								class="text-gray-800 dark:text-gray-200 underline hover:text-yellow-600"
-								on:click={() => setPromptFromSuggestion(suggestion)}
-							>
+								on:click={() => setPromptFromSuggestion(suggestion)}							>
 								{suggestion}
 							</button>
-							{#if i !== suggestions.length - 1} <!-- Check if it's not the last item -->
+							{#if i !== suggestions.length - 1}
 								<span> | </span>
 							{/if}
 						{/each}
@@ -188,10 +200,9 @@
 			</div>
 		</div>
 
-		<!-- Footer Links -->
-		<footer class="absolute bottom-0 left-0 right-0 p-4 text-center text-sm text-gray-600 dark:text-gray-400">
-			<a href="/privacy" class="hover:text-yellow-600">Privacy Policy</a> | 
-			<a href="/terms" class="hover:text-yellow-600">Terms of Service</a> | 
+		<footer class="absolute bottom-0 left-0 right-0 p-4 text-center text-xs md:text-sm text-gray-600 dark:text-gray-400">
+			<a href="/privacy" class="hover:text-yellow-600">Privacy Policy</a> |
+			<a href="/terms" class="hover:text-yellow-600">Terms of Service</a> |
 			<a href="/contact" class="hover:text-yellow-600">Contact Us</a>
 		</footer>
 	</div>
@@ -202,21 +213,8 @@
 		display: none;
 	}
 
-	.h-screen {
-		height: 100vh;
-	}
-
-	.flex-col {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.justify-center {
-		justify-content: center;
-	}
-
-	.items-center {
-		align-items: center;
+	.min-h-screen {
+		min-height: 100vh;
 	}
 
 	.gradient-text {
@@ -236,9 +234,12 @@
 		}
 	}
 
-	.mt-4 {
-		margin-left: -3rem;
+	@media (min-width: 768px) {
+		.mt-4 {
+			margin-left: 0;
+		}
 	}
+
 	footer a {
 		margin: 0 8px;
 		text-decoration: none;
@@ -249,3 +250,5 @@
 		color: #FFB94F;
 	}
 </style>
+
+
