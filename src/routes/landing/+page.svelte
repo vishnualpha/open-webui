@@ -34,12 +34,12 @@
 		});
 	};
 	let mounted = false;
-	let roles = ['best Software Professional', 'best Developer', 'best Quality Engineer', 'best DevOps Engineer', 'Alpha'];
+	let roles = ['Developers', 'Quality Engineers', 'DevOps Engineers', 'Software Professionals'];
 	let currentRoleIndex = 0;
 	let roleText = '';
 	let showCursor = true;
 	const staticText = 'Be the';
-	let prompt = '';
+	let prompt = 'I am ready to get started. Give me more details!';
 	let chatTextAreaElement;
 	let suggestions = ['How do I improve my skills?', 'Can you guide me in DevOps?', 'Help me write clean code'];
 
@@ -63,7 +63,7 @@
 	const handlePromptSubmission = () => {
 		if (prompt.trim()) {
 			localStorage.setItem('selectedPrompt', prompt);
-			goto('/auth');
+			goto('/auth?mode=signup');
 		}
 	};
 
@@ -118,10 +118,14 @@
 		<div class="flex justify-center items-center min-h-screen px-4 md:px-0">
 			<div class="max-w-4xl w-full text-center">
 				<div class="text-3xl md:text-6xl text-gray-800 dark:text-gray-100 font-large mb-8">
-					<span class="gradient-text">{$LANDING_MESSAGE}</span>
+					<span class="gradient-text">{$LANDING_MESSAGE}<br/></span>
+					<span class="gradient-text">{roleText}</span>
+					{#if showCursor}
+						<span class="blinking-cursor"></span>
+					{/if}
 				</div>
 
-				<div class="text-sm md:text-md text-gray-600 dark:text-gray-400 mb-8">
+				<div class="text-md md:text-md text-gray-600 dark:text-gray-400 mb-8">
 					{$LANDING_SUBMESSAGE}
 				</div>
 
