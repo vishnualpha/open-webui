@@ -105,6 +105,7 @@
 	});
 </script>
 
+
 <svelte:head>
 	<title>
 		{`${$WEBUI_NAME}`}
@@ -211,6 +212,7 @@
 										autocomplete="email"
 										placeholder={$i18n.t('Enter Your Email')}
 										required
+										data-verifalia-emailValidations-allow='deliverable'
 									/>
 								</div>
 
