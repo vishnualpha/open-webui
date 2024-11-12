@@ -1434,7 +1434,7 @@
 					responseMessage.info = { ...response.usage, openai: true };
 					responseMessage.done = true;
 				} else {
-					const textStream = await createOpenAITextStream(res.body, $settings.splitLargeChunks);
+					const textStream = await createOpenAITextStream(res.body, true);//$settings.splitLargeChunks
 
 					for await (const update of textStream) {
 						const { value, done, citations, error, usage } = update;
@@ -1703,7 +1703,7 @@
 			);
 
 			if (res && res.ok && res.body) {
-				const textStream = await createOpenAITextStream(res.body, $settings.splitLargeChunks);
+				const textStream = await createOpenAITextStream(res.body, true);//$settings.splitLargeChunks
 				for await (const update of textStream) {
 					const { value, done, citations, error, usage } = update;
 					if (error || done) {

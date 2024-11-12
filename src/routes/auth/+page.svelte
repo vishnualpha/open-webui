@@ -17,6 +17,7 @@
 
 	let name = '';
 	let email = '';
+	let signup_email='';
 	let password = '';
 
 	const setSessionUser = async (sessionUser) => {
@@ -44,7 +45,7 @@
 	};
 
 	const signUpHandler = async () => {
-		const sessionUser = await userSignUp(name, email, password, generateInitialsImage(name)).catch(
+		const sessionUser = await userSignUp(name, signup_email, password, generateInitialsImage(name)).catch(
 			(error) => {
 				toast.error(error);
 				return null;
@@ -205,6 +206,18 @@
 
 								<div class="mb-2">
 									<div class=" text-sm font-medium text-left mb-1">{$i18n.t('Email')}</div>
+									{#if mode === 'signup'}
+									<input
+										bind:value={signup_email}
+										type="email"
+										class=" px-5 py-3 rounded-2xl w-full text-sm outline-none border dark:border-none dark:bg-gray-900"
+										autocomplete="email"
+										placeholder={$i18n.t('Enter Your Email')}
+										required
+										data-verifalia-emailValidations-block={mode==='signup'?'risky':''}
+									/>
+									{/if}
+									{#if mode === 'signin'}
 									<input
 										bind:value={email}
 										type="email"
@@ -212,8 +225,8 @@
 										autocomplete="email"
 										placeholder={$i18n.t('Enter Your Email')}
 										required
-										data-verifalia-emailValidations-allow='deliverable'
 									/>
+									{/if}
 								</div>
 
 								<div>
