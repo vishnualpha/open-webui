@@ -371,6 +371,33 @@ class ChatTable:
                 return ChatModel.model_validate(chat)
         except Exception:
             return None
+        
+    def get_shared_chats(self, skip: int = 0, limit: int = 50) -> list[ChatModel]:
+        """Fetches shared chats with pagination, limited to those with a share_id."""
+        with get_db() as db:
+            shared_chats = (
+                db.query(Chat)
+                .filter(Chat.share_id.isnot(None))
+                .order_by(Chat.updated_at.desc())
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
+            return [ChatModel.model_validate(chat) for chat in shared_chats]
+        
+
+    def get_all_chats_with_shared_ids(self, skip: int = 0, limit: int = 50) -> list[ChatModel]:
+        """Fetches all chats that have share_ids, used primarily for admin access."""
+        with get_db() as db:
+            all_shared_chats = (
+                db.query(Chat)
+                .filter(Chat.share_id.isnot(None))
+                .order_by(Chat.updated_at.desc())
+                .offset(skip)
+                .limit(limit)
+                .all()
+            )
+            return [ChatModel.model_validate(chat) for chat in all_shared_chats]
 
     def get_chat_by_share_id(self, id: str) -> Optional[ChatModel]:
         try:

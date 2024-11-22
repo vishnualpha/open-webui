@@ -166,6 +166,33 @@ async def search_user_chats(
 
     return chat_list
 
+############################
+# GetAllSharedChats
+############################
+
+@router.get("/shared", response_model=List[ChatResponse])
+async def get_all_shared_chats(skip: int = 0, limit: int = 50, user=Depends(get_verified_user)):
+    try:
+        if user.role == "pending":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=ERROR_MESSAGES.NOT_FOUND
+            )
+
+        # Fetch shared chats considering user roles
+        if user.role == "user" or (user.role == "admin" and not ENABLE_ADMIN_CHAT_ACCESS):
+            shared_chats = Chats.get_shared_chats(skip=skip, limit=limit)
+        elif user.role == "admin" and ENABLE_ADMIN_CHAT_ACCESS:
+            shared_chats = Chats.get_all_chats_with_shared_ids(skip=skip, limit=limit)
+        
+        if shared_chats:
+            return [ChatResponse(**chat.model_dump()) for chat in shared_chats]
+        else:
+            return HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=ERROR_MESSAGES.NOT_FOUND
+            )
+    except Exception as e:
+        log.exception(e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error retrieving shared chats.")
 
 ############################
 # GetChatsByFolderId
