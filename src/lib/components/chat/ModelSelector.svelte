@@ -48,6 +48,7 @@
 			<div class="overflow-hidden w-full">
 				<div class="mr-1 max-w-full">
 					<Selector
+						id={`${selectedModelIdx}`}
 						placeholder={$i18n.t('Select a model')}
 						items={$models.map((model) => ({
 							value: model.id,
@@ -55,7 +56,7 @@
 							model: model
 						}))}
 						showTemporaryChatControl={$user.role === 'user'
-							? ($config?.permissions?.chat?.temporary ?? true)
+							? ($user?.permissions?.chat?.temporary ?? true)
 							: true}
 						bind:value={selectedModel}
 					/>

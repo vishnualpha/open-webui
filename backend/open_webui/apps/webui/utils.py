@@ -8,7 +8,6 @@ import tempfile
 
 from open_webui.apps.webui.models.functions import Functions
 from open_webui.apps.webui.models.tools import Tools
-from open_webui.config import FUNCTIONS_DIR, TOOLS_DIR
 
 
 def extract_frontmatter(content):
@@ -64,7 +63,7 @@ def replace_imports(content):
     return content
 
 
-def load_toolkit_module_by_id(toolkit_id, content=None):
+def load_tools_module_by_id(toolkit_id, content=None):
 
     if content is None:
         tool = Tools.get_tool_by_id(toolkit_id)
