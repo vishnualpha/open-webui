@@ -754,7 +754,7 @@ export const getBackendConfig = async () => {
 
 	const res = await fetch(`${WEBUI_BASE_URL}/api/config`, {
 		method: 'GET',
-		//credentials: 'include',
+		credentials: 'include',
 		headers: {
 			'Content-Type': 'application/json'
 		}
