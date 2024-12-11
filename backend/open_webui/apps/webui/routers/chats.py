@@ -269,7 +269,16 @@ async def get_all_user_tags(user=Depends(get_verified_user)):
             status_code=status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT()
         )
 
-
+@router.get("/tags/all", response_model=list[TagModel])
+async def get_all_user_tags(user=Depends(get_verified_user)):
+    try:
+        tags = Tags.get_tags_by_user_id(user.id)
+        return tags
+    except Exception as e:
+        log.exception(e)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.DEFAULT()
+        )
 ############################
 # GetAllChatsInDB
 ############################
