@@ -108,6 +108,12 @@
 	let onboarding = false;
 
 	onMount(async () => {
+		const urlParams = new URLSearchParams($page.url.search);
+		const queryMode = urlParams.get('mode');
+
+		if (queryMode) {
+			mode = queryMode;
+		}
 		if ($user !== undefined) {
 			await goto('/');
 		}
@@ -140,15 +146,17 @@
 	<div class="w-full h-full absolute top-0 left-0 bg-white dark:bg-black"></div>
 
 	{#if loaded}
-		<div class="fixed m-10 z-50">
+		<div class="fixed m-10 z-50" style="z-index:100;">
 			<div class="flex space-x-2">
 				<div class=" self-center">
-					<img
-						crossorigin="anonymous"
-						src="{WEBUI_BASE_URL}/static/favicon.png"
-						class=" w-6 rounded-full"
-						alt="logo"
-					/>
+					<a href="/">
+						<img
+							crossorigin="anonymous"
+							src="{WEBUI_BASE_URL}/static/logo.png"
+							class=" w-36 rounded-full"
+							alt="logo"
+						/>
+					</a>
 				</div>
 			</div>
 		</div>
