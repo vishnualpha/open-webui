@@ -1,6 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 import sha256 from 'js-sha256';
 
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import isToday from 'dayjs/plugin/isToday';
+import isYesterday from 'dayjs/plugin/isYesterday';
+
+dayjs.extend(relativeTime);
+dayjs.extend(isToday);
+dayjs.extend(isYesterday);
+
 import { WEBUI_BASE_URL } from '$lib/constants';
 import { TTS_RESPONSE_SPLIT } from '$lib/types';
 
@@ -8,7 +17,13 @@ import { TTS_RESPONSE_SPLIT } from '$lib/types';
 // Helper functions
 //////////////////////////
 
-export const replaceTokens = (content, char, user) => {
+export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function escapeRegExp(string: string): string {
+	return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export const replaceTokens = (content, sourceIds, char, user) => {
 	const charToken = /{{char}}/gi;
 	const userToken = /{{user}}/gi;
 	const videoIdToken = /{{VIDEO_FILE_ID_([a-f0-9-]+)}}/gi; // Regex to capture the video ID
@@ -32,9 +47,23 @@ export const replaceTokens = (content, char, user) => {
 
 	// Replace HTML ID tags with corresponding HTML content
 	content = content.replace(htmlIdToken, (match, fileId) => {
-		const htmlUrl = `${WEBUI_BASE_URL}/api/v1/files/${fileId}/content`;
+		const htmlUrl = `${WEBUI_BASE_URL}/api/v1/files/${fileId}/content/html`;
 		return `<iframe src="${htmlUrl}" width="100%" frameborder="0" onload="this.style.height=(this.contentWindow.document.body.scrollHeight+20)+'px';"></iframe>`;
 	});
+
+	// Remove sourceIds from the content and replace them with <source_id>...</source_id>
+	if (Array.isArray(sourceIds)) {
+		sourceIds.forEach((sourceId) => {
+			// Escape special characters in the sourceId
+			const escapedSourceId = escapeRegExp(sourceId);
+
+			// Create a token based on the exact `[sourceId]` string
+			const sourceToken = `\\[${escapedSourceId}\\]`; // Escape special characters for RegExp
+			const sourceRegex = new RegExp(sourceToken, 'g'); // Match all occurrences of [sourceId]
+
+			content = content.replace(sourceRegex, `<source_id data="${sourceId}" />`);
+		});
+	}
 
 	return content;
 };
@@ -52,10 +81,6 @@ export const sanitizeResponseContent = (content: string) => {
 
 export const processResponseContent = (content: string) => {
 	return content.trim();
-};
-
-export const revertSanitizedResponseContent = (content: string) => {
-	return content.replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 };
 
 export function unescapeHtml(html: string) {
@@ -169,6 +194,67 @@ export const canvasPixelTest = () => {
 	return true;
 };
 
+export const compressImage = async (imageUrl, maxWidth, maxHeight) => {
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			const canvas = document.createElement('canvas');
+			let width = img.width;
+			let height = img.height;
+
+			// Maintain aspect ratio while resizing
+
+			if (maxWidth && maxHeight) {
+				// Resize with both dimensions defined (preserves aspect ratio)
+
+				if (width <= maxWidth && height <= maxHeight) {
+					resolve(imageUrl);
+					return;
+				}
+
+				if (width / height > maxWidth / maxHeight) {
+					height = Math.round((maxWidth * height) / width);
+					width = maxWidth;
+				} else {
+					width = Math.round((maxHeight * width) / height);
+					height = maxHeight;
+				}
+			} else if (maxWidth) {
+				// Only maxWidth defined
+
+				if (width <= maxWidth) {
+					resolve(imageUrl);
+					return;
+				}
+
+				height = Math.round((maxWidth * height) / width);
+				width = maxWidth;
+			} else if (maxHeight) {
+				// Only maxHeight defined
+
+				if (height <= maxHeight) {
+					resolve(imageUrl);
+					return;
+				}
+
+				width = Math.round((maxHeight * width) / height);
+				height = maxHeight;
+			}
+
+			canvas.width = width;
+			canvas.height = height;
+
+			const context = canvas.getContext('2d');
+			context.drawImage(img, 0, 0, width, height);
+
+			// Get compressed image URL
+			const compressedUrl = canvas.toDataURL();
+			resolve(compressedUrl);
+		};
+		img.onerror = (error) => reject(error);
+		img.src = imageUrl;
+	});
+};
 export const generateInitialsImage = (name) => {
 	const canvas = document.createElement('canvas');
 	const ctx = canvas.getContext('2d');
@@ -202,6 +288,19 @@ export const generateInitialsImage = (name) => {
 	ctx.fillText(initials.toUpperCase(), canvas.width / 2, canvas.height / 2);
 
 	return canvas.toDataURL();
+};
+
+export const formatDate = (inputDate) => {
+	const date = dayjs(inputDate);
+	const now = dayjs();
+
+	if (date.isToday()) {
+		return `Today at ${date.format('HH:mm')}`;
+	} else if (date.isYesterday()) {
+		return `Yesterday at ${date.format('HH:mm')}`;
+	} else {
+		return `${date.format('DD/MM/YYYY')} at ${date.format('HH:mm')}`;
+	}
 };
 
 export const copyToClipboard = async (text) => {
@@ -273,18 +372,34 @@ export const findWordIndices = (text) => {
 };
 
 export const removeLastWordFromString = (inputString, wordString) => {
-	// Split the string into an array of words
-	const words = inputString.split(' ');
+	console.log('inputString', inputString);
+	// Split the string by newline characters to handle lines separately
+	const lines = inputString.split('\n');
 
-	if (words.at(-1) === wordString) {
-		words.pop();
+	// Take the last line to operate only on it
+	const lastLine = lines.pop();
+
+	// Split the last line into an array of words
+	const words = lastLine.split(' ');
+
+	// Conditional to check for the last word removal
+	if (words.at(-1) === wordString || (wordString === '' && words.at(-1) === '\\#')) {
+		words.pop(); // Remove last word if condition is satisfied
 	}
 
-	// Join the remaining words back into a string
-	let resultString = words.join(' ');
-	if (resultString !== '') {
-		resultString += ' ';
+	// Join the remaining words back into a string and handle space correctly
+	let updatedLastLine = words.join(' ');
+
+	// Add a trailing space to the updated last line if there are still words
+	if (updatedLastLine !== '') {
+		updatedLastLine += ' ';
 	}
+
+	// Combine the lines together again, placing the updated last line back in
+	const resultString = [...lines, updatedLastLine].join('\n');
+
+	// Return the final string
+	console.log('resultString', resultString);
 
 	return resultString;
 };
@@ -444,7 +559,7 @@ const convertOpenAIMessages = (convo) => {
 };
 
 const validateChat = (chat) => {
-	// Because ChatGPT sometimes has features we can't use like DALL-E or migh have corrupted messages, need to validate
+	// Because ChatGPT sometimes has features we can't use like DALL-E or might have corrupted messages, need to validate
 	const messages = chat.messages;
 
 	// Check if messages array is empty
@@ -518,11 +633,41 @@ export const removeEmojis = (str: string) => {
 };
 
 export const removeFormattings = (str: string) => {
-	return str.replace(/(\*)(.*?)\1/g, '').replace(/(```)(.*?)\1/gs, '');
+	return (
+		str
+			// Block elements (remove completely)
+			.replace(/(```[\s\S]*?```)/g, '') // Code blocks
+			.replace(/^\|.*\|$/gm, '') // Tables
+			// Inline elements (preserve content)
+			.replace(/(?:\*\*|__)(.*?)(?:\*\*|__)/g, '$1') // Bold
+			.replace(/(?:[*_])(.*?)(?:[*_])/g, '$1') // Italic
+			.replace(/~~(.*?)~~/g, '$1') // Strikethrough
+			.replace(/`([^`]+)`/g, '$1') // Inline code
+
+			// Links and images
+			.replace(/!?\[([^\]]*)\](?:\([^)]+\)|\[[^\]]*\])/g, '$1') // Links & images
+			.replace(/^\[[^\]]+\]:\s*.*$/gm, '') // Reference definitions
+
+			// Block formatting
+			.replace(/^#{1,6}\s+/gm, '') // Headers
+			.replace(/^\s*[-*+]\s+/gm, '') // Lists
+			.replace(/^\s*(?:\d+\.)\s+/gm, '') // Numbered lists
+			.replace(/^\s*>[> ]*/gm, '') // Blockquotes
+			.replace(/^\s*:\s+/gm, '') // Definition lists
+
+			// Cleanup
+			.replace(/\[\^[^\]]*\]/g, '') // Footnotes
+			.replace(/[-*_~]/g, '') // Remaining markers
+			.replace(/\n{2,}/g, '\n')
+	); // Multiple newlines
 };
 
 export const cleanText = (content: string) => {
 	return removeFormattings(removeEmojis(content.trim()));
+};
+
+export const removeDetailsWithReasoning = (content) => {
+	return content.replace(/<details\s+type="reasoning"[^>]*>.*?<\/details>/gis, '').trim();
 };
 
 // This regular expression matches code blocks marked by triple backticks
@@ -594,6 +739,7 @@ export const extractSentencesForAudio = (text: string) => {
 };
 
 export const getMessageContentParts = (content: string, split_on: string = 'punctuation') => {
+	content = removeDetailsWithReasoning(content);
 	const messageContentParts: string[] = [];
 
 	switch (split_on) {

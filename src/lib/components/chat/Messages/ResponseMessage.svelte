@@ -15,11 +15,10 @@
 	import {
 		copyToClipboard as _copyToClipboard,
 		approximateToHumanReadable,
-		extractParagraphsForAudio,
-		extractSentencesForAudio,
-		cleanText,
 		getMessageContentParts,
-		sanitizeResponseContent
+		sanitizeResponseContent,
+		createMessagesList,
+		formatDate
 	} from '$lib/utils';
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
@@ -32,13 +31,16 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import WebSearchResults from './ResponseMessage/WebSearchResults.svelte';
 	import Sparkles from '$lib/components/icons/Sparkles.svelte';
-	import Markdown from './Markdown.svelte';
 	import Error from './Error.svelte';
 	import Citations from './Citations.svelte';
+	import CodeExecutions from './CodeExecutions.svelte';
 
 	import type { Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
 	import ContentRenderer from './ContentRenderer.svelte';
+	import { createNewFeedback, getFeedbackById, updateFeedbackById } from '$lib/apis/evaluations';
+	import { getChatById } from '$lib/apis/chats';
+	import { generateTags } from '$lib/apis';
 
 	interface MessageType {
 		id: string;
@@ -63,7 +65,18 @@
 		};
 		done: boolean;
 		error?: boolean | { content: string };
-		citations?: string[];
+		sources?: string[];
+		code_executions?: {
+			uuid: string;
+			name: string;
+			code: string;
+			language?: string;
+			result?: {
+				error?: string;
+				output?: string;
+				files?: { name: string; url: string }[];
+			};
+		}[];
 		info?: {
 			openai?: boolean;
 			prompt_tokens?: number;
@@ -80,6 +93,7 @@
 		annotation?: { type: string; rating: number };
 	}
 
+	export let chatId = '';
 	export let history;
 	export let messageId;
 
@@ -95,11 +109,17 @@
 	export let showPreviousMessage: Function;
 	export let showNextMessage: Function;
 
+	export let updateChat: Function;
 	export let editMessage: Function;
+	export let saveMessage: Function;
 	export let rateMessage: Function;
+	export let actionMessage: Function;
 
+	export let submitMessage: Function;
 	export let continueResponse: Function;
 	export let regenerateResponse: Function;
+
+	export let addMessages: Function;
 
 	export let isLastMessage = true;
 	export let readOnly = false;
@@ -210,7 +230,7 @@
 					sentence
 				).catch((error) => {
 					console.error(error);
-					toast.error(error);
+					toast.error(`${error}`);
 
 					speaking = false;
 					loadingSpeech = false;
@@ -302,7 +322,7 @@
 	const generateImage = async (message: MessageType) => {
 		generatingImage = true;
 		const res = await imageGenerations(localStorage.token, message.content).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 		});
 		console.log(res);
 
@@ -312,10 +332,133 @@
 				url: `${image.url}`
 			}));
 
-			dispatch('save', { ...message, files: files });
+			saveMessage(message.id, {
+				...message,
+				files: files
+			});
 		}
 
 		generatingImage = false;
+	};
+
+	let feedbackLoading = false;
+
+	const feedbackHandler = async (rating: number | null = null, details: object | null = null) => {
+		feedbackLoading = true;
+		console.log('Feedback', rating, details);
+
+		const updatedMessage = {
+			...message,
+			annotation: {
+				...(message?.annotation ?? {}),
+				...(rating !== null ? { rating: rating } : {}),
+				...(details ? details : {})
+			}
+		};
+
+		const chat = await getChatById(localStorage.token, chatId).catch((error) => {
+			toast.error(`${error}`);
+		});
+		if (!chat) {
+			return;
+		}
+
+		const messages = createMessagesList(history, message.id);
+
+		let feedbackItem = {
+			type: 'rating',
+			data: {
+				...(updatedMessage?.annotation ? updatedMessage.annotation : {}),
+				model_id: message?.selectedModelId ?? message.model,
+				...(history.messages[message.parentId].childrenIds.length > 1
+					? {
+							sibling_model_ids: history.messages[message.parentId].childrenIds
+								.filter((id) => id !== message.id)
+								.map((id) => history.messages[id]?.selectedModelId ?? history.messages[id].model)
+						}
+					: {})
+			},
+			meta: {
+				arena: message ? message.arena : false,
+				model_id: message.model,
+				message_id: message.id,
+				message_index: messages.length,
+				chat_id: chatId
+			},
+			snapshot: {
+				chat: chat
+			}
+		};
+
+		const baseModels = [
+			feedbackItem.data.model_id,
+			...(feedbackItem.data.sibling_model_ids ?? [])
+		].reduce((acc, modelId) => {
+			const model = $models.find((m) => m.id === modelId);
+			if (model) {
+				acc[model.id] = model?.info?.base_model_id ?? null;
+			} else {
+				// Log or handle cases where corresponding model is not found
+				console.warn(`Model with ID ${modelId} not found`);
+			}
+			return acc;
+		}, {});
+		feedbackItem.meta.base_models = baseModels;
+
+		let feedback = null;
+		if (message?.feedbackId) {
+			feedback = await updateFeedbackById(
+				localStorage.token,
+				message.feedbackId,
+				feedbackItem
+			).catch((error) => {
+				toast.error(`${error}`);
+			});
+		} else {
+			feedback = await createNewFeedback(localStorage.token, feedbackItem).catch((error) => {
+				toast.error(`${error}`);
+			});
+
+			if (feedback) {
+				updatedMessage.feedbackId = feedback.id;
+			}
+		}
+
+		console.log(updatedMessage);
+		saveMessage(message.id, updatedMessage);
+
+		await tick();
+
+		if (!details) {
+			showRateComment = true;
+
+			if (!updatedMessage.annotation?.tags) {
+				// attempt to generate tags
+				const tags = await generateTags(localStorage.token, message.model, messages, chatId).catch(
+					(error) => {
+						console.error(error);
+						return [];
+					}
+				);
+				console.log(tags);
+
+				if (tags) {
+					updatedMessage.annotation.tags = tags;
+					feedbackItem.data.tags = tags;
+
+					saveMessage(message.id, updatedMessage);
+					await updateFeedbackById(
+						localStorage.token,
+						updatedMessage.feedbackId,
+						feedbackItem
+					).catch((error) => {
+						toast.error(`${error}`);
+					});
+				}
+			}
+		}
+
+		feedbackLoading = false;
 	};
 
 	$: if (!edit) {
@@ -325,7 +468,7 @@
 	}
 
 	onMount(async () => {
-		console.log('ResponseMessage mounted');
+		// console.log('ResponseMessage mounted');
 
 		await tick();
 	});
@@ -337,21 +480,30 @@
 		id="message-{message.id}"
 		dir={$settings.chatDirection}
 	>
-		<ProfileImage
-			src={model?.info?.meta?.profile_image_url ??
-				($i18n.language === 'dg-DG' ? `/doge.png` : `${WEBUI_BASE_URL}/static/favicon.png`)}
-		/>
+		<div class={`flex-shrink-0 ${($settings?.chatDirection ?? 'LTR') === 'LTR' ? 'mr-3' : 'ml-3'}`}>
+			<ProfileImage
+				src={model?.info?.meta?.profile_image_url ??
+					($i18n.language === 'dg-DG' ? `/doge.png` : `${WEBUI_BASE_URL}/static/favicon.png`)}
+				className={'size-8'}
+			/>
+		</div>
 
 		<div class="flex-auto w-0 pl-1">
 			<Name>
-				{model?.name ?? message.model}
+				<Tooltip content={model?.name ?? message.model} placement="top-start">
+					<span class="line-clamp-1">
+						{model?.name ?? message.model}
+					</span>
+				</Tooltip>
 
 				{#if message.timestamp}
-					<span
-						class=" self-center invisible group-hover:visible text-gray-400 text-xs font-medium uppercase ml-0.5 -mt-0.5"
+					<div
+						class=" self-center text-xs invisible group-hover:visible text-gray-400 font-medium first-letter:capitalize ml-0.5 translate-y-[1px]"
 					>
-						{dayjs(message.timestamp * 1000).format($i18n.t('h:mm a'))}
-					</span>
+						<Tooltip content={dayjs(message.timestamp * 1000).format('dddd, DD MMMM YYYY HH:mm')}>
+							<span class="line-clamp-1">{formatDate(message.timestamp * 1000)}</span>
+						</Tooltip>
+					</div>
 				{/if}
 			</Name>
 
@@ -374,37 +526,76 @@
 							{@const status = (
 								message?.statusHistory ?? [...(message?.status ? [message?.status] : [])]
 							).at(-1)}
-							<div class="status-description flex items-center gap-2 pt-0.5 pb-1">
-								{#if status?.done === false}
-									<div class="">
-										<Spinner className="size-4" />
-									</div>
-								{/if}
+							{#if !status?.hidden}
+								<div class="status-description flex items-center gap-2 py-0.5">
+									{#if status?.done === false}
+										<div class="">
+											<Spinner className="size-4" />
+										</div>
+									{/if}
 
-								{#if status?.action === 'web_search' && status?.urls}
-									<WebSearchResults {status}>
+									{#if status?.action === 'web_search' && status?.urls}
+										<WebSearchResults {status}>
+											<div class="flex flex-col justify-center -space-y-0.5">
+												<div
+													class="{status?.done === false
+														? 'shimmer'
+														: ''} text-base line-clamp-1 text-wrap"
+												>
+													<!-- $i18n.t("Generating search query") -->
+													<!-- $i18n.t("No search query generated") -->
+
+													<!-- $i18n.t('Searched {{count}} sites') -->
+													{#if status?.description.includes('{{count}}')}
+														{$i18n.t(status?.description, {
+															count: status?.urls.length
+														})}
+													{:else if status?.description === 'No search query generated'}
+														{$i18n.t('No search query generated')}
+													{:else if status?.description === 'Generating search query'}
+														{$i18n.t('Generating search query')}
+													{:else}
+														{status?.description}
+													{/if}
+												</div>
+											</div>
+										</WebSearchResults>
+									{:else if status?.action === 'knowledge_search'}
 										<div class="flex flex-col justify-center -space-y-0.5">
 											<div
 												class="{status?.done === false
 													? 'shimmer'
-													: ''} text-base line-clamp-1 text-wrap"
+													: ''} text-gray-500 dark:text-gray-500 text-base line-clamp-1 text-wrap"
 											>
-												{status?.description}
+												{$i18n.t(`Searching Knowledge for "{{searchQuery}}"`, {
+													searchQuery: status.query
+												})}
 											</div>
 										</div>
-									</WebSearchResults>
-								{:else}
-									<div class="flex flex-col justify-center -space-y-0.5">
-										<div
-											class="{status?.done === false
-												? 'shimmer'
-												: ''} text-gray-500 dark:text-gray-500 text-base line-clamp-1 text-wrap"
-										>
-											{status?.description}
+									{:else}
+										<div class="flex flex-col justify-center -space-y-0.5">
+											<div
+												class="{status?.done === false
+													? 'shimmer'
+													: ''} text-gray-500 dark:text-gray-500 text-base line-clamp-1 text-wrap"
+											>
+												<!-- $i18n.t(`Searching "{{searchQuery}}"`) -->
+												{#if status?.description.includes('{{searchQuery}}')}
+													{$i18n.t(status?.description, {
+														searchQuery: status?.query
+													})}
+												{:else if status?.description === 'No search query generated'}
+													{$i18n.t('No search query generated')}
+												{:else if status?.description === 'Generating search query'}
+													{$i18n.t('Generating search query')}
+												{:else}
+													{status?.description}
+												{/if}
+											</div>
 										</div>
-									</div>
-								{/if}
-							</div>
+									{/if}
+								</div>
+							{/if}
 						{/if}
 
 						{#if edit === true}
@@ -477,10 +668,23 @@
 									<!-- unless message.error === true which is legacy error handling, where the error message is stored in message.content -->
 									<ContentRenderer
 										id={message.id}
+										{history}
 										content={message.content}
+										sources={message.sources}
 										floatingButtons={message?.done}
-										save={true}
+										save={!readOnly}
 										{model}
+										onSourceClick={(e) => {
+											console.log(e);
+											const sourceButton = document.getElementById(`source-${e}`);
+
+											if (sourceButton) {
+												sourceButton.click();
+											}
+										}}
+										onAddMessages={({ modelId, parentId, messages }) => {
+											addMessages({ modelId, parentId, messages });
+										}}
 										on:update={(e) => {
 											const { raw, oldContent, newContent } = e.detail;
 
@@ -488,33 +692,34 @@
 												message.id
 											].content.replace(raw, raw.replace(oldContent, newContent));
 
-											dispatch('update');
+											updateChat();
 										}}
 										on:select={(e) => {
 											const { type, content } = e.detail;
 
 											if (type === 'explain') {
-												dispatch('submit', {
-													parentId: message.id,
-													prompt: `Explain this section to me in more detail\n\n\`\`\`\n${content}\n\`\`\``
-												});
+												submitMessage(
+													message.id,
+													`Explain this section to me in more detail\n\n\`\`\`\n${content}\n\`\`\``
+												);
 											} else if (type === 'ask') {
 												const input = e.detail?.input ?? '';
-												dispatch('submit', {
-													parentId: message.id,
-													prompt: `\`\`\`\n${content}\n\`\`\`\n${input}`
-												});
+												submitMessage(message.id, `\`\`\`\n${content}\n\`\`\`\n${input}`);
 											}
 										}}
 									/>
 								{/if}
 
-								{#if message.error}
+								{#if message?.error}
 									<Error content={message?.error?.content ?? message.content} />
 								{/if}
 
-								{#if message.citations}
-									<Citations citations={message.citations} />
+								{#if (message?.sources || message?.citations) && (model?.info?.meta?.capabilities?.citations ?? true)}
+									<Citations sources={message?.sources ?? message?.citations} />
+								{/if}
+
+								{#if message.code_executions}
+									<CodeExecutions codeExecutions={message.code_executions} />
 								{/if}
 							</div>
 						{/if}
@@ -582,7 +787,7 @@
 
 							{#if message.done}
 								{#if !readOnly}
-									{#if $user.role === 'user' ? ($config?.permissions?.chat?.editing ?? true) : true}
+									{#if $user.role === 'user' ? ($user?.permissions?.chat?.edit ?? true) : true}
 										<Tooltip content={$i18n.t('Edit')} placement="bottom">
 											<button
 												class="{isLastMessage
@@ -715,7 +920,7 @@
 									</button>
 								</Tooltip>
 
-								{#if $config?.features.enable_image_generation && !readOnly}
+								{#if $config?.features.enable_image_generation && ($user.role === 'admin' || $user?.permissions?.features?.image_generation) && !readOnly}
 									<Tooltip content={$i18n.t('Generate Image')} placement="bottom">
 										<button
 											class="{isLastMessage
@@ -779,82 +984,45 @@
 									</Tooltip>
 								{/if}
 
-								{#if message.info}
+								{#if message.usage}
 									<Tooltip
-										content={message.info.openai
-											? message.info.usage
-												? `<pre>${sanitizeResponseContent(
-														JSON.stringify(message.info.usage, null, 2)
-															.replace(/"([^(")"]+)":/g, '$1:')
-															.slice(1, -1)
-															.split('\n')
-															.map((line) => line.slice(2))
-															.map((line) => (line.endsWith(',') ? line.slice(0, -1) : line))
-															.join('\n')
-													)}</pre>`
-												: `prompt_tokens: ${message.info.prompt_tokens ?? 'N/A'}<br/>
-													completion_tokens: ${message.info.completion_tokens ?? 'N/A'}<br/>
-													total_tokens: ${message.info.total_tokens ?? 'N/A'}`
-											: `response_token/s: ${
-													`${
-														Math.round(
-															((message.info.eval_count ?? 0) /
-																((message.info.eval_duration ?? 0) / 1000000000)) *
-																100
-														) / 100
-													} tokens` ?? 'N/A'
-												}<br/>
-					prompt_token/s: ${
-						Math.round(
-							((message.info.prompt_eval_count ?? 0) /
-								((message.info.prompt_eval_duration ?? 0) / 1000000000)) *
-								100
-						) / 100 ?? 'N/A'
-					} tokens<br/>
-		            total_duration: ${
-									Math.round(((message.info.total_duration ?? 0) / 1000000) * 100) / 100 ?? 'N/A'
-								}ms<br/>
-		            load_duration: ${
-									Math.round(((message.info.load_duration ?? 0) / 1000000) * 100) / 100 ?? 'N/A'
-								}ms<br/>
-		            prompt_eval_count: ${message.info.prompt_eval_count ?? 'N/A'}<br/>
-		            prompt_eval_duration: ${
-									Math.round(((message.info.prompt_eval_duration ?? 0) / 1000000) * 100) / 100 ??
-									'N/A'
-								}ms<br/>
-		            eval_count: ${message.info.eval_count ?? 'N/A'}<br/>
-		            eval_duration: ${
-									Math.round(((message.info.eval_duration ?? 0) / 1000000) * 100) / 100 ?? 'N/A'
-								}ms<br/>
-		            approximate_total: ${approximateToHumanReadable(message.info.total_duration ?? 0)}`}
-										placement="top"
+										content={message.usage
+											? `<pre>${sanitizeResponseContent(
+													JSON.stringify(message.usage, null, 2)
+														.replace(/"([^(")"]+)":/g, '$1:')
+														.slice(1, -1)
+														.split('\n')
+														.map((line) => line.slice(2))
+														.map((line) => (line.endsWith(',') ? line.slice(0, -1) : line))
+														.join('\n')
+												)}</pre>`
+											: ''}
+										placement="bottom"
 									>
-										<Tooltip content={$i18n.t('Generation Info')} placement="bottom">
-											<button
-												class=" {isLastMessage
-													? 'visible'
-													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition whitespace-pre-wrap"
-												on:click={() => {
-													console.log(message);
-												}}
-												id="info-{message.id}"
+										<button
+											class=" {isLastMessage
+												? 'visible'
+												: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition whitespace-pre-wrap"
+											on:click={() => {
+												console.log(message);
+											}}
+											id="info-{message.id}"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke-width="2.3"
+												stroke="currentColor"
+												class="w-4 h-4"
 											>
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke-width="2.3"
-													stroke="currentColor"
-													class="w-4 h-4"
-												>
-													<path
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
-													/>
-												</svg>
-											</button>
-										</Tooltip>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+												/>
+											</svg>
+										</button>
 									</Tooltip>
 								{/if}
 
@@ -864,28 +1032,14 @@
 											<button
 												class="{isLastMessage
 													? 'visible'
-													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg {(message
-													?.annotation?.rating ?? null) === 1
+													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg {(
+													message?.annotation?.rating ?? ''
+												).toString() === '1'
 													? 'bg-gray-100 dark:bg-gray-800'
-													: ''} dark:hover:text-white hover:text-black transition"
+													: ''} dark:hover:text-white hover:text-black transition disabled:cursor-progress disabled:hover:bg-transparent"
+												disabled={feedbackLoading}
 												on:click={async () => {
-													await rateMessage(message.id, 1);
-
-													(model?.actions ?? [])
-														.filter((action) => action?.__webui__ ?? false)
-														.forEach((action) => {
-															dispatch('action', {
-																id: action.id,
-																event: {
-																	id: 'good-response',
-																	data: {
-																		messageId: message.id
-																	}
-																}
-															});
-														});
-
-													showRateComment = true;
+													await feedbackHandler(1);
 													window.setTimeout(() => {
 														document
 															.getElementById(`message-feedback-${message.id}`)
@@ -914,28 +1068,14 @@
 											<button
 												class="{isLastMessage
 													? 'visible'
-													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg {(message
-													?.annotation?.rating ?? null) === -1
+													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg {(
+													message?.annotation?.rating ?? ''
+												).toString() === '-1'
 													? 'bg-gray-100 dark:bg-gray-800'
-													: ''} dark:hover:text-white hover:text-black transition"
+													: ''} dark:hover:text-white hover:text-black transition disabled:cursor-progress disabled:hover:bg-transparent"
+												disabled={feedbackLoading}
 												on:click={async () => {
-													await rateMessage(message.id, -1);
-
-													(model?.actions ?? [])
-														.filter((action) => action?.__webui__ ?? false)
-														.forEach((action) => {
-															dispatch('action', {
-																id: action.id,
-																event: {
-																	id: 'bad-response',
-																	data: {
-																		messageId: message.id
-																	}
-																}
-															});
-														});
-
-													showRateComment = true;
+													await feedbackHandler(-1);
 													window.setTimeout(() => {
 														document
 															.getElementById(`message-feedback-${message.id}`)
@@ -971,20 +1111,6 @@
 													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition regenerate-response-button"
 												on:click={() => {
 													continueResponse();
-
-													(model?.actions ?? [])
-														.filter((action) => action?.__webui__ ?? false)
-														.forEach((action) => {
-															dispatch('action', {
-																id: action.id,
-																event: {
-																	id: 'continue-response',
-																	data: {
-																		messageId: message.id
-																	}
-																}
-															});
-														});
 												}}
 											>
 												<svg
@@ -1008,69 +1134,71 @@
 												</svg>
 											</button>
 										</Tooltip>
+									{/if}
 
-										<Tooltip content={$i18n.t('Regenerate')} placement="bottom">
-											<button
-												type="button"
-												class="{isLastMessage
-													? 'visible'
-													: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition regenerate-response-button"
-												on:click={() => {
-													showRateComment = false;
-													regenerateResponse(message);
+									<Tooltip content={$i18n.t('Regenerate')} placement="bottom">
+										<button
+											type="button"
+											class="{isLastMessage
+												? 'visible'
+												: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition regenerate-response-button"
+											on:click={() => {
+												showRateComment = false;
+												regenerateResponse(message);
 
-													(model?.actions ?? [])
-														.filter((action) => action?.__webui__ ?? false)
-														.forEach((action) => {
-															dispatch('action', {
-																id: action.id,
-																event: {
-																	id: 'regenerate-response',
-																	data: {
-																		messageId: message.id
-																	}
-																}
-															});
-														});
-												}}
+												(model?.actions ?? []).forEach((action) => {
+													dispatch('action', {
+														id: action.id,
+														event: {
+															id: 'regenerate-response',
+															data: {
+																messageId: message.id
+															}
+														}
+													});
+												});
+											}}
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke-width="2.3"
+												stroke="currentColor"
+												class="w-4 h-4"
 											>
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke-width="2.3"
-													stroke="currentColor"
-													class="w-4 h-4"
-												>
-													<path
-														stroke-linecap="round"
-														stroke-linejoin="round"
-														d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-													/>
-												</svg>
-											</button>
-										</Tooltip>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+												/>
+											</svg>
+										</button>
+									</Tooltip>
 
-										{#each (model?.actions ?? []).filter((action) => !(action?.__webui__ ?? false)) as action}
+									{#if isLastMessage}
+										{#each model?.actions ?? [] as action}
 											<Tooltip content={action.name} placement="bottom">
 												<button
 													type="button"
 													class="{isLastMessage
 														? 'visible'
-														: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition regenerate-response-button"
+														: 'invisible group-hover:visible'} p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg dark:hover:text-white hover:text-black transition"
 													on:click={() => {
-														dispatch('action', action.id);
+														actionMessage(action.id, message);
 													}}
 												>
 													{#if action.icon_url}
-														<img
-															src={action.icon_url}
-															class="w-4 h-4 {action.icon_url.includes('svg')
-																? 'dark:invert-[80%]'
-																: ''}"
-															style="fill: currentColor;"
-															alt={action.name}
-														/>
+														<div class="size-4">
+															<img
+																src={action.icon_url}
+																class="w-4 h-4 {action.icon_url.includes('svg')
+																	? 'dark:invert-[80%]'
+																	: ''}"
+																style="fill: currentColor;"
+																alt={action.name}
+															/>
+														</div>
 													{:else}
 														<Sparkles strokeWidth="2.1" className="size-4" />
 													{/if}
@@ -1087,30 +1215,10 @@
 						<RateComment
 							bind:message
 							bind:show={showRateComment}
-							on:submit={(e) => {
-								dispatch('save', {
-									...message,
-									annotation: {
-										...message.annotation,
-										comment: e.detail.comment,
-										reason: e.detail.reason
-									}
+							on:save={async (e) => {
+								await feedbackHandler(null, {
+									...e.detail
 								});
-								(model?.actions ?? [])
-									.filter((action) => action?.__webui__ ?? false)
-									.forEach((action) => {
-										dispatch('action', {
-											id: action.id,
-											event: {
-												id: 'rate-comment',
-												data: {
-													messageId: message.id,
-													comment: e.detail.comment,
-													reason: e.detail.reason
-												}
-											}
-										});
-									});
 							}}
 						/>
 					{/if}
@@ -1128,49 +1236,5 @@
 	.buttons {
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
-	}
-
-	@keyframes shimmer {
-		0% {
-			background-position: 200% 0;
-		}
-		100% {
-			background-position: -200% 0;
-		}
-	}
-
-	.shimmer {
-		background: linear-gradient(90deg, #9a9b9e 25%, #2a2929 50%, #9a9b9e 75%);
-		background-size: 200% 100%;
-		background-clip: text;
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		animation: shimmer 4s linear infinite;
-		color: #818286; /* Fallback color */
-	}
-
-	:global(.dark) .shimmer {
-		background: linear-gradient(90deg, #818286 25%, #eae5e5 50%, #818286 75%);
-		background-size: 200% 100%;
-		background-clip: text;
-		-webkit-background-clip: text;
-		-webkit-text-fill-color: transparent;
-		animation: shimmer 4s linear infinite;
-		color: #a1a3a7; /* Darker fallback color for dark mode */
-	}
-
-	@keyframes smoothFadeIn {
-		0% {
-			opacity: 0;
-			transform: translateY(-10px);
-		}
-		100% {
-			opacity: 1;
-			transform: translateY(0);
-		}
-	}
-
-	.status-description {
-		animation: smoothFadeIn 0.2s forwards;
 	}
 </style>

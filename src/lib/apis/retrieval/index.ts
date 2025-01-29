@@ -40,10 +40,12 @@ type ContentExtractConfigForm = {
 type YoutubeConfigForm = {
 	language: string[];
 	translation?: string | null;
+	proxy_url: string;
 };
 
 type RAGConfigForm = {
 	pdf_extract_images?: boolean;
+	enable_google_drive_integration?: boolean;
 	chunk?: ChunkConfigForm;
 	content_extraction?: ContentExtractConfigForm;
 	web_loader_ssl_verification?: boolean;
@@ -200,13 +202,13 @@ export const getEmbeddingConfig = async (token: string) => {
 type OpenAIConfigForm = {
 	key: string;
 	url: string;
-	batch_size: number;
 };
 
 type EmbeddingModelUpdateForm = {
 	openai_config?: OpenAIConfigForm;
 	embedding_engine: string;
 	embedding_model: string;
+	embedding_batch_size?: number;
 };
 
 export const updateEmbeddingConfig = async (token: string, payload: EmbeddingModelUpdateForm) => {

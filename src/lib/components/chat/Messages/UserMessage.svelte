@@ -1,25 +1,21 @@
 <script lang="ts">
 	import dayjs from 'dayjs';
 	import { toast } from 'svelte-sonner';
-	import { tick, createEventDispatcher, getContext, onMount } from 'svelte';
+	import { tick, getContext, onMount } from 'svelte';
 
 	import { models, settings } from '$lib/stores';
 	import { user as _user } from '$lib/stores';
-	import {
-		copyToClipboard as _copyToClipboard,
-		processResponseContent,
-		replaceTokens
-	} from '$lib/utils';
+	import { copyToClipboard as _copyToClipboard, formatDate } from '$lib/utils';
 
 	import Name from './Name.svelte';
 	import ProfileImage from './ProfileImage.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import FileItem from '$lib/components/common/FileItem.svelte';
 	import Markdown from './Markdown.svelte';
+	import Image from '$lib/components/common/Image.svelte';
 
 	const i18n = getContext('i18n');
 
-	const dispatch = createEventDispatcher();
 	export let user;
 
 	export let history;
@@ -31,6 +27,7 @@
 	export let showNextMessage: Function;
 
 	export let editMessage: Function;
+	export let deleteMessage: Function;
 
 	export let isFirstMessage: boolean;
 	export let readOnly: boolean;
@@ -78,23 +75,27 @@
 	};
 
 	const deleteMessageHandler = async () => {
-		dispatch('delete', message.id);
+		deleteMessage(message.id);
 	};
 
 	onMount(() => {
-		console.log('UserMessage mounted');
+		// console.log('UserMessage mounted');
 	});
 </script>
 
 <div class=" flex w-full user-message" dir={$settings.chatDirection} id="message-{message.id}">
 	{#if !($settings?.chatBubble ?? true)}
-		<ProfileImage
-			src={message.user
-				? ($models.find((m) => m.id === message.user)?.info?.meta?.profile_image_url ?? '/user.png')
-				: (user?.profile_image_url ?? '/user.png')}
-		/>
+		<div class={`flex-shrink-0 ${($settings?.chatDirection ?? 'LTR') === 'LTR' ? 'mr-3' : 'ml-3'}`}>
+			<ProfileImage
+				src={message.user
+					? ($models.find((m) => m.id === message.user)?.info?.meta?.profile_image_url ??
+						'/user.png')
+					: (user?.profile_image_url ?? '/user.png')}
+				className={'size-8'}
+			/>
+		</div>
 	{/if}
-	<div class="w-full w-0 pl-1">
+	<div class="flex-auto w-0 max-w-full pl-1">
 		{#if !($settings?.chatBubble ?? true)}
 			<div>
 				<Name>
@@ -108,11 +109,13 @@
 					{/if}
 
 					{#if message.timestamp}
-						<span
-							class=" invisible group-hover:visible text-gray-400 text-xs font-medium uppercase ml-0.5 -mt-0.5"
+						<div
+							class=" self-center text-xs invisible group-hover:visible text-gray-400 font-medium first-letter:capitalize ml-0.5 translate-y-[1px]"
 						>
-							{dayjs(message.timestamp * 1000).format($i18n.t('h:mm a'))}
-						</span>
+							<Tooltip content={dayjs(message.timestamp * 1000).format('dddd, DD MMMM YYYY HH:mm')}>
+								<span class="line-clamp-1">{formatDate(message.timestamp * 1000)}</span>
+							</Tooltip>
+						</div>
 					{/if}
 				</Name>
 			</div>
@@ -124,7 +127,7 @@
 					{#each message.files as file}
 						<div class={($settings?.chatBubble ?? true) ? 'self-end' : ''}>
 							{#if file.type === 'image'}
-								<img src={file.url} alt="input" class=" max-h-96 rounded-lg" draggable="false" />
+								<Image src={file.url} imageClassName=" max-h-96 rounded-lg" />
 							{:else}
 								<FileItem
 									item={file}
@@ -142,28 +145,30 @@
 
 			{#if edit === true}
 				<div class=" w-full bg-gray-50 dark:bg-gray-800 rounded-3xl px-5 py-3 mb-2">
-					<textarea
-						id="message-edit-{message.id}"
-						bind:this={messageEditTextAreaElement}
-						class=" bg-transparent outline-none w-full resize-none"
-						bind:value={editedContent}
-						on:input={(e) => {
-							e.target.style.height = '';
-							e.target.style.height = `${e.target.scrollHeight}px`;
-						}}
-						on:keydown={(e) => {
-							if (e.key === 'Escape') {
-								document.getElementById('close-edit-message-button')?.click();
-							}
+					<div class="max-h-96 overflow-auto">
+						<textarea
+							id="message-edit-{message.id}"
+							bind:this={messageEditTextAreaElement}
+							class=" bg-transparent outline-none w-full resize-none"
+							bind:value={editedContent}
+							on:input={(e) => {
+								e.target.style.height = '';
+								e.target.style.height = `${e.target.scrollHeight}px`;
+							}}
+							on:keydown={(e) => {
+								if (e.key === 'Escape') {
+									document.getElementById('close-edit-message-button')?.click();
+								}
 
-							const isCmdOrCtrlPressed = e.metaKey || e.ctrlKey;
-							const isEnterPressed = e.key === 'Enter';
+								const isCmdOrCtrlPressed = e.metaKey || e.ctrlKey;
+								const isEnterPressed = e.key === 'Enter';
 
-							if (isCmdOrCtrlPressed && isEnterPressed) {
-								document.getElementById('confirm-edit-message-button')?.click();
-							}
-						}}
-					/>
+								if (isCmdOrCtrlPressed && isEnterPressed) {
+									document.getElementById('confirm-edit-message-button')?.click();
+								}
+							}}
+						/>
+					</div>
 
 					<div class=" mt-2 mb-1 flex justify-between text-sm font-medium">
 						<div>

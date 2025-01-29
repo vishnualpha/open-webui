@@ -57,7 +57,7 @@
 				valves,
 				selectedPipelinesUrlIdx
 			).catch((error) => {
-				toast.error(error);
+				toast.error(`${error}`);
 			});
 
 			if (res) {
@@ -118,7 +118,7 @@
 			pipelineDownloadUrl,
 			selectedPipelinesUrlIdx
 		).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			return null;
 		});
 
@@ -157,7 +157,7 @@
 		}
 
 		pipelineFiles = null;
-		const pipelineUploadInputElement = document.getElementById('pipeline-upload-input');
+		const pipelineUploadInputElement = document.getElementById('pipelines-upload-input');
 
 		if (pipelineUploadInputElement) {
 			pipelineUploadInputElement.value = null;
@@ -172,7 +172,7 @@
 			pipelines[selectedPipelineIdx].id,
 			selectedPipelinesUrlIdx
 		).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			return null;
 		});
 
@@ -546,12 +546,14 @@
 		{/if}
 	</div>
 
-	<div class="flex justify-end pt-3 text-sm font-medium">
-		<button
-			class=" px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-gray-100 transition rounded-lg"
-			type="submit"
-		>
-			{$i18n.t('Save')}
-		</button>
-	</div>
+	{#if PIPELINES_LIST !== null && PIPELINES_LIST.length > 0}
+		<div class="flex justify-end pt-3 text-sm font-medium">
+			<button
+				class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full"
+				type="submit"
+			>
+				{$i18n.t('Save')}
+			</button>
+		</div>
+	{/if}
 </form>
