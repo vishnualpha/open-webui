@@ -6,7 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { getSessionUser } from '$lib/apis/auths';
 	import ArchiveBox from '$lib/components/icons/ArchiveBox.svelte';
-	import { showSettings, activeUserCount, USAGE_POOL, mobile, showSidebar } from '$lib/stores';
+	import { showSettings, activeUserIds, USAGE_POOL, mobile, showSidebar } from '$lib/stores';
 	import { fade, slide } from 'svelte/transition';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 
@@ -124,7 +124,7 @@
 						</svg>
 					</div>
 					<div class=" self-center font-medium">{$i18n.t('Playground')}</div>
-				</button>
+				</a>
 				{#if adminDetails.name==='alphadude'} 
 				<button
 					class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
@@ -190,8 +190,8 @@
 				<div class=" self-center font-medium">{$i18n.t('Sign Out')}</div>
 			</button>
 
-			{#if $activeUserCount}
-				<hr class=" dark:border-gray-800 my-1.5 p-0" />
+			{#if $activeUserIds?.length > 0}
+				<hr class=" border-gray-50 dark:border-gray-850 my-1 p-0" />
 
 				<Tooltip
 					content={$USAGE_POOL && $USAGE_POOL.length > 0
@@ -213,7 +213,7 @@
 								{$i18n.t('Active Users')}:
 							</span>
 							<span class=" font-semibold">
-								{$activeUserCount}
+								{$activeUserIds?.length}
 							</span>
 						</div>
 					</div>

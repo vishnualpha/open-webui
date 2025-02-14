@@ -28,6 +28,7 @@
 		label: '',
 		host: '',
 		port: '',
+		attribute_for_mail: 'mail',
 		attribute_for_username: 'uid',
 		app_dn: '',
 		app_dn_password: '',
@@ -41,7 +42,7 @@
 	const updateLdapServerHandler = async () => {
 		if (!ENABLE_LDAP) return;
 		const res = await updateLdapServer(localStorage.token, LDAP_SERVER).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			return null;
 		});
 		if (res) {
@@ -112,11 +113,47 @@
 					</div>
 				</div>
 
-				<div class=" flex w-full justify-between pr-2">
-					<div class=" self-center text-xs font-medium">{$i18n.t('Enable API Key Auth')}</div>
+				<div class=" flex w-full justify-between pr-2 my-3">
+					<div class=" self-center text-xs font-medium">{$i18n.t('Enable API Key')}</div>
 
 					<Switch bind:state={adminConfig.ENABLE_API_KEY} />
 				</div>
+
+				{#if adminConfig?.ENABLE_API_KEY}
+					<div class=" flex w-full justify-between pr-2 my-3">
+						<div class=" self-center text-xs font-medium">
+							{$i18n.t('API Key Endpoint Restrictions')}
+						</div>
+
+						<Switch bind:state={adminConfig.ENABLE_API_KEY_ENDPOINT_RESTRICTIONS} />
+					</div>
+
+					{#if adminConfig?.ENABLE_API_KEY_ENDPOINT_RESTRICTIONS}
+						<div class=" flex w-full flex-col pr-2">
+							<div class=" text-xs font-medium">
+								{$i18n.t('Allowed Endpoints')}
+							</div>
+
+							<input
+								class="w-full mt-1 rounded-lg text-sm dark:text-gray-300 bg-transparent outline-none"
+								type="text"
+								placeholder={`e.g.) /api/v1/messages, /api/v1/channels`}
+								bind:value={adminConfig.API_KEY_ALLOWED_ENDPOINTS}
+							/>
+
+							<div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+								<!-- https://docs.openwebui.com/getting-started/advanced-topics/api-endpoints -->
+								<a
+									href="https://docs.openwebui.com/getting-started/api-endpoints"
+									target="_blank"
+									class=" text-gray-300 font-medium underline"
+								>
+									{$i18n.t('To learn more about available endpoints, visit our documentation.')}
+								</a>
+							</div>
+						</div>
+					{/if}
+				{/if}
 
 				<hr class=" border-gray-50 dark:border-gray-850 my-2" />
 
@@ -304,6 +341,26 @@
 									placeholder={$i18n.t('Enter Application DN Password')}
 									bind:value={LDAP_SERVER.app_dn_password}
 								/>
+							</div>
+						</div>
+						<div class="flex w-full gap-2">
+							<div class="w-full">
+								<div class=" self-center text-xs font-medium min-w-fit mb-1">
+									{$i18n.t('Attribute for Mail')}
+								</div>
+								<Tooltip
+									content={$i18n.t(
+										'The LDAP attribute that maps to the mail that users use to sign in.'
+									)}
+									placement="top-start"
+								>
+									<input
+										class="w-full bg-transparent outline-none py-0.5"
+										required
+										placeholder={$i18n.t('Example: mail')}
+										bind:value={LDAP_SERVER.attribute_for_mail}
+									/>
+								</Tooltip>
 							</div>
 						</div>
 						<div class="flex w-full gap-2">
