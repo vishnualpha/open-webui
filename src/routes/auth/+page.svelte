@@ -230,13 +230,12 @@
 									<div class=" text-sm font-medium text-left mb-1">{$i18n.t('Email')}</div>
 									{#if mode === 'signup'}
 									<input
-										bind:value={signup_email}
+										bind:value={email}
 										type="email"
 										class=" px-5 py-3 rounded-2xl w-full text-sm outline-none border dark:border-none dark:bg-gray-900"
 										autocomplete="email"
 										placeholder={$i18n.t('Enter Your Email')}
 										required
-										data-verifalia-emailValidations-block={mode==='signup'?'risky':''}
 									/>
 									{/if}
 									{#if mode === 'signin'}

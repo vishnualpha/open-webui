@@ -1057,7 +1057,7 @@ async def process_chat_response(
         async def post_response_handler(response, events):
             def serialize_content_blocks(content_blocks, raw=False):
                 content = ""
-
+                #print("Here is the content block"+str(content_blocks))
                 for block in content_blocks:
                     if block["type"] == "text":
                         content = f"{content}{block['content'].strip()}\n"

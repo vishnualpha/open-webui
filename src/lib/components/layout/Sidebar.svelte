@@ -645,7 +645,7 @@
 		
 
 		
-		<div class="px-2.5 flex justify-center text-gray-800 dark:text-gray-200">
+		<!--<div class="px-2.5 flex justify-center text-gray-800 dark:text-gray-200">
 			<a
 				class="flex-grow flex space-x-3 rounded-xl px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 transition"
 				href="/community"
@@ -683,7 +683,7 @@
 					<div class=" self-center font-medium text-sm font-primary">{$i18n.t('Community')}</div>
 				</div>
 			</a>
-		</div>
+		</div>-->
 		
 
 		<div class="relative {$temporaryChatEnabled ? 'opacity-20' : ''}">

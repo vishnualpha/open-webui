@@ -110,7 +110,7 @@ export const importChat = async (
 
 // In $lib/apis/chats.js
 
-export async function getAllSharedChats(token: string, page: number, limit: number) {
+/*export async function getAllSharedChats(token: string, page: number, limit: number) {
     const skip = page * limit;
 	let error = null;
     const res = await fetch(`${WEBUI_API_BASE_URL}/chats/shared?skip=${skip}&limit=${limit}`,{
@@ -139,7 +139,7 @@ export async function getAllSharedChats(token: string, page: number, limit: numb
 	}
 
 	return res;
-};
+};*/
 
 export const getChatList = async (token: string = '', page: number | null = null) => {
 	let error = null;
