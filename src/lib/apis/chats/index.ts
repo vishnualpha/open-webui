@@ -32,6 +32,42 @@ export const createNewChat = async (token: string, chat: object) => {
 	return res;
 };
 
+// In $lib/apis/chats.js
+
+export async function getAllSharedChats(token: string, page: number, limit: number) {
+    const skip = page * limit;
+	let error = null;
+    const res = await fetch(`${WEBUI_API_BASE_URL}/chats/shared?skip=${skip}&limit=${limit}`,{
+		method: 'GET',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			authorization: `Bearer ${token}`
+		}
+	})
+		.then(async (res) => {
+			if (!res.ok) throw await res.json();
+			return res.json();
+		})
+		.then((json) => {
+			return json;
+		})
+		.catch((err) => {
+			error = err;
+			console.log(err);
+			return null;
+		});
+
+	if (error) {
+		throw error;
+	}
+	console.log(res);
+	return res.map((chat) => ({
+		...chat,
+		time_range: getTimeRange(chat.updated_at)
+	}));
+}
+
 export const importChat = async (
 	token: string,
 	chat: object,
@@ -74,7 +110,7 @@ export const importChat = async (
 
 // In $lib/apis/chats.js
 
-export async function getAllSharedChats(token: string, page: number, limit: number) {
+/*export async function getAllSharedChats(token: string, page: number, limit: number) {
     const skip = page * limit;
 	let error = null;
     const res = await fetch(`${WEBUI_API_BASE_URL}/chats/shared?skip=${skip}&limit=${limit}`,{
@@ -101,12 +137,9 @@ export async function getAllSharedChats(token: string, page: number, limit: numb
 	if (error) {
 		throw error;
 	}
-	console.log(res);
-	return res.map((chat) => ({
-		...chat,
-		time_range: getTimeRange(chat.updated_at)
-	}));
-}
+
+	return res;
+};*/
 
 export const getChatList = async (token: string = '', page: number | null = null) => {
 	let error = null;
@@ -616,10 +649,51 @@ export const toggleChatPinnedStatusById = async (token: string, id: string) => {
 	return res;
 };
 
-export const cloneChatById = async (token: string, id: string) => {
+export const cloneChatById = async (token: string, id: string, title?: string) => {
 	let error = null;
 
 	const res = await fetch(`${WEBUI_API_BASE_URL}/chats/${id}/clone`, {
+		method: 'POST',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...(token && { authorization: `Bearer ${token}` })
+		},
+		body: JSON.stringify({
+			...(title && { title: title })
+		})
+	})
+		.then(async (res) => {
+			if (!res.ok) throw await res.json();
+			return res.json();
+		})
+		.then((json) => {
+			return json;
+		})
+		.catch((err) => {
+			error = err;
+
+			if ('detail' in err) {
+				error = err.detail;
+			} else {
+				error = err;
+			}
+
+			console.log(err);
+			return null;
+		});
+
+	if (error) {
+		throw error;
+	}
+
+	return res;
+};
+
+export const cloneSharedChatById = async (token: string, id: string) => {
+	let error = null;
+
+	const res = await fetch(`${WEBUI_API_BASE_URL}/chats/${id}/clone/shared`, {
 		method: 'POST',
 		headers: {
 			Accept: 'application/json',

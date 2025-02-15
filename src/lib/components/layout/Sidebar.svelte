@@ -16,7 +16,11 @@
 		pinnedChats,
 		scrollPaginationEnabled,
 		currentChatPage,
-		temporaryChatEnabled
+		temporaryChatEnabled,
+		channels,
+		socket,
+		config,
+		isApp
 	} from '$lib/stores';
 	import { onMount, getContext, tick, onDestroy } from 'svelte';
 
@@ -49,6 +53,11 @@
 	import Plus from '../icons/Plus.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import Folders from './Sidebar/Folders.svelte';
+	import { getChannels, createNewChannel } from '$lib/apis/channels';
+	import ChannelModal from './Sidebar/ChannelModal.svelte';
+	import ChannelItem from './Sidebar/ChannelItem.svelte';
+	import PencilSquare from '../icons/PencilSquare.svelte';
+	import Home from '../icons/Home.svelte';
 
 	const BREAKPOINT = 768;
 
@@ -61,6 +70,8 @@
 	let showDropdown = false;
 	let showPinnedChat = true;
 
+	let showCreateChannel = false;
+
 	// Pagination variables
 	let chatListLoading = false;
 	let allChatsLoaded = false;
@@ -69,7 +80,7 @@
 
 	const initFolders = async () => {
 		const folderList = await getFolders(localStorage.token).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			return [];
 		});
 
@@ -134,13 +145,17 @@
 		};
 
 		const res = await createNewFolder(localStorage.token, name).catch((error) => {
-			toast.error(error);
+			toast.error(`${error}`);
 			return null;
 		});
 
 		if (res) {
 			await initFolders();
 		}
+	};
+
+	const initChannels = async () => {
+		await channels.set(await getChannels(localStorage.token));
 	};
 
 	const initChatList = async () => {
@@ -331,12 +346,19 @@
 	onMount(async () => {
 		showPinnedChat = localStorage?.showPinnedChat ? localStorage.showPinnedChat === 'true' : true;
 
-		mobile.subscribe((e) => {
-			if ($showSidebar && e) {
+		mobile.subscribe((value) => {
+			if ($showSidebar && value) {
 				showSidebar.set(false);
 			}
 
-			if (!$showSidebar && !e) {
+			if ($showSidebar && !value) {
+				const navElement = document.getElementsByTagName('nav')[0];
+				if (navElement) {
+					navElement.style['-webkit-app-region'] = 'drag';
+				}
+			}
+
+			if (!$showSidebar && !value) {
 				showSidebar.set(true);
 			}
 		});
@@ -344,8 +366,24 @@
 		showSidebar.set(!$mobile ? localStorage.sidebar === 'true' : false);
 		showSidebar.subscribe((value) => {
 			localStorage.sidebar = value;
+
+			// nav element is not available on the first render
+			const navElement = document.getElementsByTagName('nav')[0];
+
+			if (navElement) {
+				if ($mobile) {
+					if (!value) {
+						navElement.style['-webkit-app-region'] = 'drag';
+					} else {
+						navElement.style['-webkit-app-region'] = 'no-drag';
+					}
+				} else {
+					navElement.style['-webkit-app-region'] = 'drag';
+				}
+			}
 		});
 
+		await initChannels();
 		await initChatList();
 
 		window.addEventListener('keydown', onKeyDown);
@@ -389,11 +427,32 @@
 	}}
 />
 
+<ChannelModal
+	bind:show={showCreateChannel}
+	onSubmit={async ({ name, access_control }) => {
+		const res = await createNewChannel(localStorage.token, {
+			name: name,
+			access_control: access_control
+		}).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
+
+		if (res) {
+			$socket.emit('join-channels', { auth: { token: $user.token } });
+			await initChannels();
+			showCreateChannel = false;
+		}
+	}}
+/>
+
 <!-- svelte-ignore a11y-no-static-element-interactions -->
 
 {#if $showSidebar}
 	<div
-		class=" fixed md:hidden z-40 top-0 right-0 left-0 bottom-0 bg-black/60 w-full min-h-screen h-screen flex justify-center overflow-hidden overscroll-contain"
+		class=" {$isApp
+			? ' ml-[4.5rem] md:ml-0'
+			: ''} fixed md:hidden z-40 top-0 right-0 left-0 bottom-0 bg-black/60 w-full min-h-screen h-screen flex justify-center overflow-hidden overscroll-contain"
 		on:mousedown={() => {
 			showSidebar.set(!$showSidebar);
 		}}
@@ -405,7 +464,9 @@
 	id="sidebar"
 	class="h-screen max-h-[100dvh] min-h-screen select-none {$showSidebar
 		? 'md:relative w-[260px] max-w-[260px]'
-		: '-translate-x-[260px] w-[0px]'} bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-200 text-sm transition fixed z-50 top-0 left-0 overflow-x-hidden
+		: '-translate-x-[260px] w-[0px]'} {$isApp
+		? `ml-[4.5rem] md:ml-0 `
+		: 'transition-width duration-200 ease-in-out'}  flex-shrink-0 bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-200 text-sm fixed z-50 top-0 left-0 overflow-x-hidden
         "
 	data-state={$showSidebar}
 >
@@ -415,36 +476,6 @@
 			: 'invisible'}"
 	>
 		<div class="px-1.5 flex justify-between space-x-1 text-gray-600 dark:text-gray-400">
-			<a
-				id="sidebar-new-chat-button"
-				class="flex flex-1 rounded-lg px-2 py-1 h-full hover:bg-gray-100 dark:hover:bg-gray-900 transition"
-				href="/"
-				draggable="false"
-				on:click={async () => {
-					selectedChatId = null;
-					await goto('/');
-					const newChatButton = document.getElementById('new-chat-button');
-					setTimeout(() => {
-						newChatButton?.click();
-						if ($mobile) {
-							showSidebar.set(false);
-						}
-					}, 0);
-				}}
-			>
-				<div class="self-center mx-1.5">
-					<img
-						crossorigin="anonymous"
-						src="{WEBUI_BASE_URL}/static/favicon.png"
-						class=" size-5 -translate-x-1.5 rounded-full"
-						alt="logo"
-					/>
-				</div>
-				<div class=" self-center font-medium text-sm text-gray-850 dark:text-white font-primary">
-					{$i18n.t('New Chat')}
-				</div>
-			</a>
-
 			<button
 				class=" cursor-pointer p-[7px] flex rounded-xl hover:bg-gray-100 dark:hover:bg-gray-900 transition"
 				on:click={() => {
@@ -468,12 +499,74 @@
 					</svg>
 				</div>
 			</button>
+
+			<a
+				id="sidebar-new-chat-button"
+				class="flex justify-between items-center flex-1 rounded-lg px-2 py-1 h-full text-right hover:bg-gray-100 dark:hover:bg-gray-900 transition no-drag-region"
+				href="/"
+				draggable="false"
+				on:click={async () => {
+					selectedChatId = null;
+					await goto('/');
+					const newChatButton = document.getElementById('new-chat-button');
+					setTimeout(() => {
+						newChatButton?.click();
+						if ($mobile) {
+							showSidebar.set(false);
+						}
+					}, 0);
+				}}
+			>
+				<div class="flex items-center">
+					<div class="self-center mx-1.5">
+						<img
+							crossorigin="anonymous"
+							src="{WEBUI_BASE_URL}/static/favicon.png"
+							class=" size-5 -translate-x-1.5 rounded-full"
+							alt="logo"
+						/>
+					</div>
+					<div class=" self-center font-medium text-sm text-gray-850 dark:text-white font-primary">
+						{$i18n.t('New Chat')}
+					</div>
+				</div>
+
+				<div>
+					<PencilSquare className=" size-5" strokeWidth="2" />
+				</div>
+			</a>
 		</div>
+
+		<!-- {#if $user?.role === 'admin'}
+			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
+				<a
+					class="flex-grow flex items-center space-x-3 rounded-lg px-2 py-[7px] hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+					href="/home"
+					on:click={() => {
+						selectedChatId = null;
+						chatId.set('');
+
+						if ($mobile) {
+							showSidebar.set(false);
+						}
+					}}
+					draggable="false"
+				>
+					<div class="self-center">
+						<Home strokeWidth="2" className="size-[1.1rem]" />
+					</div>
+
+					<div class="flex self-center translate-y-[0.5px]">
+						<div class=" self-center font-medium text-sm font-primary">{$i18n.t('Home')}</div>
+					</div>
+				</a>
+			</div>
+		{/if} -->
 
 		{#if $user?.role === 'admin' || $user?.permissions?.workspace?.models || $user?.permissions?.workspace?.knowledge || $user?.permissions?.workspace?.prompts || $user?.permissions?.workspace?.tools}
 			<div class="px-1.5 flex justify-center text-gray-800 dark:text-gray-200">
 				<a
-					class="flex-grow flex space-x-3 rounded-lg px-2 py-[7px] hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+					class="flex-grow flex items-center space-x-3 rounded-lg px-2 py-[7px] hover:bg-gray-100 dark:hover:bg-gray-900 transition"
 					href="/workspace"
 					on:click={() => {
 						selectedChatId = null;
@@ -502,7 +595,7 @@
 						</svg>
 					</div>
 
-					<div class="flex self-center">
+					<div class="flex self-center translate-y-[0.5px]">
 						<div class=" self-center font-medium text-sm font-primary">{$i18n.t('Workspace')}</div>
 					</div>
 				</a>
@@ -551,92 +644,230 @@
 		</div>
 		
 
-		<div
-			class="relative flex flex-col flex-1 overflow-y-auto {$temporaryChatEnabled
-				? 'opacity-20'
-				: ''}"
-		>
+		
+		<!--<div class="px-2.5 flex justify-center text-gray-800 dark:text-gray-200">
+			<a
+				class="flex-grow flex space-x-3 rounded-xl px-2.5 py-2 hover:bg-gray-100 dark:hover:bg-gray-900 transition"
+				href="/community"
+				on:click={() => {
+					selectedChatId = null;
+					chatId.set('');
+
+					if ($mobile) {
+						showSidebar.set(false);
+					}
+				}}
+				draggable="false"
+			>
+				<div class="self-center">
+					<svg xmlns="http://www.w3.org/2000/svg"
+						fill="none"
+						viewBox="0 0 20 20"
+						stroke-width="1"
+						stroke="currentColor"
+						class="size-[1.2rem]">
+
+						<g fill="#000000" fill-rule="evenodd" clip-rule="evenodd">
+
+						<path d="M8.302 3.288A3.633 3.633 0 002.756 7.76c.124.237.112.49.102.61a2.984 2.984 0 01-.084.468 7.853 7.853 0 01-.2.655c.26-.09.52-.17.75-.223a.7.7 0 11.312 1.365c-.34.078-.837.258-1.278.434a23.211 23.211 0 00-.701.295l-.042.018-.01.005-.003.001a.7.7 0 01-.925-.927v-.001l.002-.004.008-.018.03-.07a21.252 21.252 0 00.43-1.047c.113-.3.211-.592.27-.822.021-.09.034-.157.041-.205a5.033 5.033 0 017.74-6.082.7.7 0 01-.896 1.076zM1.463 8.226v0z"/>
+
+						<path d="M4.75 9.333a5.083 5.083 0 119.657 2.221c.006.033.015.077.029.133.05.197.14.453.248.734.087.223.178.443.262.646l.06.146c.049.118.094.23.131.326.03.082.074.2.097.306a.75.75 0 01-.734.905c-.169 0-.332-.04-.447-.072a4.867 4.867 0 01-.394-.134c-.188-.072-.402-.162-.606-.248l-.216-.09a7.634 7.634 0 00-.705-.265 1.739 1.739 0 00-.095-.026A5.083 5.083 0 014.75 9.333zm1.5 0a3.583 3.583 0 116.763 1.654c-.124.239-.12.485-.11.614.01.155.043.313.08.456.054.214.132.448.216.676a7.37 7.37 0 00-.643-.231 2.456 2.456 0 00-.443-.093 1.113 1.113 0 00-.626.104 3.583 3.583 0 01-5.237-3.18zm8.15 2.16l-.001-.012v.013z"/>
+
+						</g>
+
+					</svg>
+					
+				</div>
+
+				<div class="flex self-center">
+					<div class=" self-center font-medium text-sm font-primary">{$i18n.t('Community')}</div>
+				</div>
+			</a>
+		</div>-->
+		
+
+		<div class="relative {$temporaryChatEnabled ? 'opacity-20' : ''}">
 			{#if $temporaryChatEnabled}
 				<div class="absolute z-40 w-full h-full flex justify-center"></div>
 			{/if}
 
-			{#if !search && $pinnedChats.length > 0}
-				<div class="flex flex-col space-y-1 rounded-xl">
-					<Folder
-						className="px-2"
-						bind:open={showPinnedChat}
-						on:change={(e) => {
-							localStorage.setItem('showPinnedChat', e.detail);
-							console.log(e.detail);
-						}}
-						on:import={(e) => {
-							importChatHandler(e.detail, true);
-						}}
-						on:drop={async (e) => {
-							const { type, id, item } = e.detail;
+			<SearchInput
+				bind:value={search}
+				on:input={searchDebounceHandler}
+				placeholder={$i18n.t('Search')}
+			/>
+		</div>
+		
 
-							if (type === 'chat') {
-								let chat = await getChatById(localStorage.token, id).catch((error) => {
-									return null;
-								});
-								if (!chat && item) {
-									chat = await importChat(localStorage.token, item.chat, item?.meta ?? {});
-								}
+		<div
+			class="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden {$temporaryChatEnabled
+				? 'opacity-20'
+				: ''}"
+		>
+			{#if $config?.features?.enable_channels && ($user.role === 'admin' || $channels.length > 0) && !search}
+				<Folder
+					className="px-2 mt-0.5"
+					name={$i18n.t('Channels')}
+					dragAndDrop={false}
+					onAdd={async () => {
+						if ($user.role === 'admin') {
+							await tick();
 
-								if (chat) {
-									console.log(chat);
-									if (chat.folder_id) {
-										const res = await updateChatFolderIdById(
-											localStorage.token,
-											chat.id,
-											null
-										).catch((error) => {
-											toast.error(error);
-											return null;
-										});
-									}
-
-									if (!chat.pinned) {
-										const res = await toggleChatPinnedStatusById(localStorage.token, chat.id);
-									}
-
-									initChatList();
-								}
-							}
-						}}
-						name={$i18n.t('Pinned')}
-					>
-						<div
-							class="ml-3 pl-1 mt-[1px] flex flex-col overflow-y-auto scrollbar-hidden border-s border-gray-100 dark:border-gray-900"
-						>
-							{#each $pinnedChats as chat, idx}
-								<ChatItem
-									className=""
-									id={chat.id}
-									title={chat.title}
-									{shiftKey}
-									selected={selectedChatId === chat.id}
-									on:select={() => {
-										selectedChatId = chat.id;
-									}}
-									on:unselect={() => {
-										selectedChatId = null;
-									}}
-									on:change={async () => {
-										initChatList();
-									}}
-									on:tag={(e) => {
-										const { type, name } = e.detail;
-										tagEventHandler(type, name, chat.id);
-									}}
-								/>
-							{/each}
-						</div>
-					</Folder>
-				</div>
+							setTimeout(() => {
+								showCreateChannel = true;
+							}, 0);
+						}
+					}}
+					onAddLabel={$i18n.t('Create Channel')}
+				>
+					{#each $channels as channel}
+						<ChannelItem
+							{channel}
+							onUpdate={async () => {
+								await initChannels();
+							}}
+						/>
+					{/each}
+				</Folder>
 			{/if}
 
-			<div class=" flex-1 flex flex-col overflow-y-auto scrollbar-hidden">
+			<Folder
+				collapsible={!search}
+				className="px-2 mt-0.5"
+				name={$i18n.t('Chats')}
+				onAdd={() => {
+					createFolder();
+				}}
+				onAddLabel={$i18n.t('New Folder')}
+				on:import={(e) => {
+					importChatHandler(e.detail);
+				}}
+				on:drop={async (e) => {
+					const { type, id, item } = e.detail;
+
+					if (type === 'chat') {
+						let chat = await getChatById(localStorage.token, id).catch((error) => {
+							return null;
+						});
+						if (!chat && item) {
+							chat = await importChat(localStorage.token, item.chat, item?.meta ?? {});
+						}
+
+						if (chat) {
+							console.log(chat);
+							if (chat.folder_id) {
+								const res = await updateChatFolderIdById(localStorage.token, chat.id, null).catch(
+									(error) => {
+										toast.error(`${error}`);
+										return null;
+									}
+								);
+							}
+
+							if (chat.pinned) {
+								const res = await toggleChatPinnedStatusById(localStorage.token, chat.id);
+							}
+
+							initChatList();
+						}
+					} else if (type === 'folder') {
+						if (folders[id].parent_id === null) {
+							return;
+						}
+
+						const res = await updateFolderParentIdById(localStorage.token, id, null).catch(
+							(error) => {
+								toast.error(`${error}`);
+								return null;
+							}
+						);
+
+						if (res) {
+							await initFolders();
+						}
+					}
+				}}
+			>
+				{#if $temporaryChatEnabled}
+					<div class="absolute z-40 w-full h-full flex justify-center"></div>
+				{/if}
+
+				{#if !search && $pinnedChats.length > 0}
+					<div class="flex flex-col space-y-1 rounded-xl">
+						<Folder
+							className=""
+							bind:open={showPinnedChat}
+							on:change={(e) => {
+								localStorage.setItem('showPinnedChat', e.detail);
+								console.log(e.detail);
+							}}
+							on:import={(e) => {
+								importChatHandler(e.detail, true);
+							}}
+							on:drop={async (e) => {
+								const { type, id, item } = e.detail;
+
+								if (type === 'chat') {
+									let chat = await getChatById(localStorage.token, id).catch((error) => {
+										return null;
+									});
+									if (!chat && item) {
+										chat = await importChat(localStorage.token, item.chat, item?.meta ?? {});
+									}
+
+									if (chat) {
+										console.log(chat);
+										if (chat.folder_id) {
+											const res = await updateChatFolderIdById(
+												localStorage.token,
+												chat.id,
+												null
+											).catch((error) => {
+												toast.error(`${error}`);
+												return null;
+											});
+										}
+
+										if (!chat.pinned) {
+											const res = await toggleChatPinnedStatusById(localStorage.token, chat.id);
+										}
+
+										initChatList();
+									}
+								}
+							}}
+							name={$i18n.t('Pinned')}
+						>
+							<div
+								class="ml-3 pl-1 mt-[1px] flex flex-col overflow-y-auto scrollbar-hidden border-s border-gray-100 dark:border-gray-900"
+							>
+								{#each $pinnedChats as chat, idx}
+									<ChatItem
+										className=""
+										id={chat.id}
+										title={chat.title}
+										{shiftKey}
+										selected={selectedChatId === chat.id}
+										on:select={() => {
+											selectedChatId = chat.id;
+										}}
+										on:unselect={() => {
+											selectedChatId = null;
+										}}
+										on:change={async () => {
+											initChatList();
+										}}
+										on:tag={(e) => {
+											const { type, name } = e.detail;
+											tagEventHandler(type, name, chat.id);
+										}}
+									/>
+								{/each}
+							</div>
+						</Folder>
+					</div>
+				{/if}
+
 				{#if !search && folders}
 					<Folders
 						{folders}
@@ -653,59 +884,7 @@
 					/>
 				{/if}
 
-				<Folder
-					collapsible={!search}
-					className="px-2 mt-0.5"
-					name={$i18n.t('All chats')}
-					on:import={(e) => {
-						importChatHandler(e.detail);
-					}}
-					on:drop={async (e) => {
-						const { type, id, item } = e.detail;
-
-						if (type === 'chat') {
-							let chat = await getChatById(localStorage.token, id).catch((error) => {
-								return null;
-							});
-							if (!chat && item) {
-								chat = await importChat(localStorage.token, item.chat, item?.meta ?? {});
-							}
-
-							if (chat) {
-								console.log(chat);
-								if (chat.folder_id) {
-									const res = await updateChatFolderIdById(localStorage.token, chat.id, null).catch(
-										(error) => {
-											toast.error(error);
-											return null;
-										}
-									);
-								}
-
-								if (chat.pinned) {
-									const res = await toggleChatPinnedStatusById(localStorage.token, chat, id);
-								}
-
-								initChatList();
-							}
-						} else if (type === 'folder') {
-							if (folders[id].parent_id === null) {
-								return;
-							}
-
-							const res = await updateFolderParentIdById(localStorage.token, id, null).catch(
-								(error) => {
-									toast.error(error);
-									return null;
-								}
-							);
-
-							if (res) {
-								await initFolders();
-							}
-						}
-					}}
-				>
+				<div class=" flex-1 flex flex-col overflow-y-auto scrollbar-hidden">
 					<div class="pt-1.5">
 						{#if $chats}
 							{#each $chats as chat, idx}
@@ -783,8 +962,8 @@
 							</div>
 						{/if}
 					</div>
-				</Folder>
-			</div>
+				</div>
+			</Folder>
 		</div>
 
 		<div class="px-2">
