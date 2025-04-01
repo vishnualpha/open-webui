@@ -6,7 +6,7 @@
 	import { goto } from '$app/navigation';
 	import { getSessionUser } from '$lib/apis/auths';
 	import ArchiveBox from '$lib/components/icons/ArchiveBox.svelte';
-	import { showSettings, activeUserIds, USAGE_POOL, mobile, showSidebar } from '$lib/stores';
+	import { showSettings, activeUserIds, USAGE_POOL, mobile, showSidebar, user } from '$lib/stores';
 	import { fade, slide } from 'svelte/transition';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import { userSignOut } from '$lib/apis/auths';
@@ -159,14 +159,17 @@
 				{/if}
 			{/if}
 
-			<hr class=" border-gray-50 dark:border-gray-850 my-1 p-0" />
+			<hr class=" border-gray-100 dark:border-gray-850 my-1 p-0" />
 
 			<button
 				class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
 				on:click={async () => {
 					await userSignOut();
+					user.set(null);
+
 					localStorage.removeItem('token');
 					location.href = '/auth';
+
 					show = false;
 				}}
 			>
@@ -193,7 +196,7 @@
 			</button>
 
 			{#if $activeUserIds?.length > 0}
-				<hr class=" border-gray-50 dark:border-gray-850 my-1 p-0" />
+				<hr class=" border-gray-100 dark:border-gray-850 my-1 p-0" />
 
 				<Tooltip
 					content={$USAGE_POOL && $USAGE_POOL.length > 0
