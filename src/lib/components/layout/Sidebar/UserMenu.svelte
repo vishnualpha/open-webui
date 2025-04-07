@@ -164,11 +164,11 @@
 			<button
 				class="flex rounded-md py-2 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition"
 				on:click={async () => {
-					await userSignOut();
-					user.set(null);
+					//await userSignOut();
+					//user.set(null);
 
 					localStorage.removeItem('token');
-					location.href = '/auth';
+					location.href = '/landing';
 
 					show = false;
 				}}
