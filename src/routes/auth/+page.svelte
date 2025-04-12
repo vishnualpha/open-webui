@@ -184,12 +184,14 @@
 	<div class="fixed m-10 z-50">
 		<div class="flex space-x-2">
 			<div class=" self-center">
+				<a href="/">
 				<img
 					crossorigin="anonymous"
-					src="{WEBUI_BASE_URL}/static/favicon.png"
-					class=" w-8 rounded-full"
+					src="{WEBUI_BASE_URL}/static/logo.png"
+					class=" w-20 md:w-36 rounded-full"
 					alt="logo"
 				/>
+			</a>
 			</div>
 		</div>
 	</div>
@@ -290,7 +292,7 @@
 										<input
 											bind:value={password}
 											type="password"
-											class="my-0.5 w-full text-sm outline-hidden bg-transparent"
+											class=" px-5 py-3 rounded-2xl w-full text-sm outline-none border dark:border-none dark:bg-gray-900"
 											placeholder={$i18n.t('Enter Your Password')}
 											autocomplete="current-password"
 											name="current-password"

@@ -591,13 +591,13 @@
 
 			document.getElementById('splash-screen')?.remove();
 
-			const audio = new Audio(`/audio/greeting.mp3`);
+			/*const audio = new Audio(`/audio/greeting.mp3`);
 			const playAudio = () => {
 				audio.play();
 				document.removeEventListener('click', playAudio);
 			};
 
-			document.addEventListener('click', playAudio);
+			document.addEventListener('click', playAudio);*/
 
 			loaded = true;
 		} else {
