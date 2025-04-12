@@ -1,6 +1,6 @@
 {
-  "name": "TheAlpha.dev",
-  "short_name": "TheAlpha",
+  "name": "Open WebUI",
+  "short_name": "WebUI",
   "icons": [
     {
       "src": "/static/web-app-manifest-192x192.png",
