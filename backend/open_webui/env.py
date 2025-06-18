@@ -109,7 +109,7 @@ WEBUI_NAME = os.environ.get("WEBUI_NAME", "TheAlpha.dev")
 if WEBUI_NAME != "TheAlpha.dev":
     WEBUI_NAME += " (TheAlpha.dev)"
 
-WEBUI_FAVICON_URL = "https://openwebui.com/favicon.png"
+WEBUI_FAVICON_URL = f"{OPEN_WEBUI_DIR}/static/favicon.png"
 
 TRUSTED_SIGNATURE_KEY = os.environ.get("TRUSTED_SIGNATURE_KEY", "")
 

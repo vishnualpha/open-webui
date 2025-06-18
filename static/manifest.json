@@ -1,1 +1,23 @@
-{}
+{
+    "name": "TheAlpha",
+    "short_name": "TheAlpha",
+    "description": "TheAlpha is an Intelligence Engine for Professionals",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#343541",
+    "orientation": "natural",
+    "icons": [
+        {
+            "src": "/static/logo.png",
+            "type": "image/png",
+            "sizes": "500x500",
+            "purpose": "any"
+        },
+        {
+            "src": "/static/logo.png",
+            "type": "image/png",
+            "sizes": "500x500",
+            "purpose": "maskable"
+        }
+    ]
+}

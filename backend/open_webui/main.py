@@ -18,7 +18,7 @@ from typing import Optional
 from aiocache import cached
 import aiohttp
 import requests
-
+import tiktoken
 
 from fastapi import (
     Depends,
@@ -1138,7 +1138,12 @@ async def chat_completion(
 generate_chat_completions = chat_completion
 generate_chat_completion = chat_completion
 
-
+async def estimate_tokens_used(messages, tokenizer):
+    """Estimate the number of tokens used based on the input messages."""
+    total_tokens = 0
+    for message in messages:
+        total_tokens += len(tokenizer.encode(message.get('content', '')))  # Assuming messages have a 'content' key
+    return total_tokens
 @app.post("/api/chat/completed")
 async def chat_completed(
     request: Request, form_data: dict, user=Depends(get_verified_user)
@@ -1393,7 +1398,7 @@ async def get_manifest_json():
     return {
         "name": app.state.WEBUI_NAME,
         "short_name": app.state.WEBUI_NAME,
-        "description": "Open WebUI is an open, extensible, user-friendly interface for AI that adapts to your workflow.",
+        "description": "TheAlpha is an Intelligence Engine for Professionals",
         "start_url": "/",
         "display": "standalone",
         "background_color": "#343541",

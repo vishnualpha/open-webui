@@ -97,7 +97,7 @@
 				<img
 					crossorigin="anonymous"
 					src="{WEBUI_BASE_URL}/static/logo.png"
-					class="w-20 md:w-36 rounded-full"
+					class="w-20 md:w-60"
 					alt="logo"
 				/>
 			</a>
